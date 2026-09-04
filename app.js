@@ -118,6 +118,7 @@ async function enterApp() {
   await loadMemos();
   goToday();
   checkReminders();
+  watchRemote();          // 다른 기기에서 바뀌면 바로 가져오기
 }
 
 // ── 데이터 불러오기 / 저장 ──
@@ -659,7 +660,49 @@ h2{font-size:15px;margin:22px 0 8px;padding-bottom:4px;border-bottom:2px solid #
 
 // 1분마다 알림 확인, 앱으로 돌아올 때도 확인
 setInterval(checkReminders, 60 * 1000);
-document.addEventListener('visibilitychange', () => { if (!document.hidden) checkReminders(); });
+
+// ── 자동 새로고침 (PC에서 바뀐 메모를 알아서 가져옵니다) ──
+let refreshing = false;
+async function autoRefresh() {
+  if (refreshing || !user) return;
+  // 편집 화면에서 타이핑 중이면 방해하지 않습니다.
+  if (!editView.classList.contains('hidden')) return;
+  refreshing = true;
+  try {
+    await loadMemos();
+    renderCalendar(); renderList(); checkReminders();
+  } catch (e) { console.error('자동 새로고침 실패:', e); }
+  finally { refreshing = false; }
+}
+// 폰 화면을 벗어날 때(앱 전환·화면 끄기) 쓰던 내용을 바로 저장합니다.
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden && current && saveTimer) commitCurrent();
+});
+
+setInterval(autoRefresh, 60 * 1000);              // 1분마다
+window.addEventListener('online', autoRefresh);   // 인터넷이 돌아오면
+
+// 앱으로 돌아올 때 (폰에서 다른 앱 갔다 오면)
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) return;
+  checkReminders();
+  autoRefresh();
+});
+
+// PC나 다른 기기에서 바뀌면 즉시 반영 (실시간 감지)
+function watchRemote() {
+  if (!sb || !user) return;
+  try {
+    sb.channel('idea_memos_watch_web')
+      .on('postgres_changes',
+        { event: '*', schema: 'public', table: 'idea_memos', filter: `user_id=eq.${user.id}` },
+        () => { setTimeout(autoRefresh, 1200); })
+      .subscribe();
+  } catch (e) {
+    // 실시간 감지가 막혀 있어도 1분 주기 새로고침으로 동작합니다.
+    console.error('실시간 감지 실패(주기 새로고침으로 대체):', e);
+  }
+}
 
 // ── 연결 설정 화면 ──
 function openSetup() {

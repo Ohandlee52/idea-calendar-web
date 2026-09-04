@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#5b6ef5" />
+  <title>아이디어 캘린더</title>
+  <link rel="manifest" href="manifest.json" />
+  <link rel="stylesheet" href="app.css" />
+</head>
+<body>
+
+  <!-- ───── 연결 설정 화면 (처음 한 번만) ───── -->
+  <section id="setupView" class="login-view hidden">
+    <div class="login-box">
+      <div class="login-logo">⚙️</div>
+      <h1>연결 설정</h1>
+      <p class="login-sub">
+        내 Supabase 정보를 한 번만 입력하면 됩니다.<br>
+        (대시보드 → Settings → API)
+      </p>
+      <input id="setupUrl" type="url" inputmode="url" placeholder="Project URL (https://xxx.supabase.co)" />
+      <input id="setupKey" type="text" placeholder="anon public 키" />
+      <button id="setupSave" class="primary-btn big">저장하고 시작</button>
+      <p class="login-msg">⚠️ secret / service_role 키는 넣지 마세요. 공개용 anon 키만 사용합니다.</p>
+    </div>
+  </section>
+
+  <!-- ───── 로그인 화면 ───── -->
+  <section id="loginView" class="login-view hidden">
+    <div class="login-box">
+      <div class="login-logo">💡</div>
+      <h1>아이디어 캘린더</h1>
+      <p class="login-sub">폰에서도 메모를 쓰고 볼 수 있어요</p>
+
+      <input id="loginEmail" type="email" inputmode="email" autocomplete="email"
+             placeholder="이메일" />
+      <input id="loginPw" type="password" autocomplete="current-password"
+             placeholder="비밀번호 (6자 이상)" />
+
+      <button id="loginBtn" class="primary-btn big">로그인</button>
+      <button id="signupBtn" class="ghost-btn">처음이신가요? 계정 만들기</button>
+
+      <p id="loginMsg" class="login-msg"></p>
+    </div>
+  </section>
+
+  <!-- ───── 메인 화면 ───── -->
+  <section id="mainView" class="main-view hidden">
+
+    <header class="top-bar">
+      <button id="menuBtn" class="icon-btn" title="메뉴">☰</button>
+      <div id="topTitle" class="top-title">아이디어 캘린더</div>
+      <button id="searchBtn" class="icon-btn" title="검색">🔍</button>
+    </header>
+
+    <!-- 검색 줄 (검색 버튼을 누르면 나타남) -->
+    <div id="searchBar" class="search-bar hidden">
+      <input id="searchInput" type="search" placeholder="제목·내용·태그 검색" />
+      <button id="searchClose" class="icon-btn">✕</button>
+    </div>
+
+    <!-- 오늘의 알림 -->
+    <div id="reminderBar" class="reminder-bar hidden"></div>
+
+    <!-- 달력 -->
+    <div id="calendarWrap" class="calendar-wrap">
+      <div class="cal-head">
+        <button id="prevMonth" class="icon-btn">‹</button>
+        <div id="monthLabel" class="month-label">0000년 0월</div>
+        <button id="nextMonth" class="icon-btn">›</button>
+        <button id="todayBtn" class="chip-btn">오늘</button>
+      </div>
+      <div class="weekdays">
+        <span class="sun">일</span><span>월</span><span>화</span>
+        <span>수</span><span>목</span><span>금</span><span class="sat">토</span>
+      </div>
+      <div id="daysGrid" class="days-grid"></div>
+    </div>
+
+    <!-- 메모 목록 -->
+    <div class="list-head">
+      <h2 id="listTitle">날짜를 선택하세요</h2>
+      <span id="syncStatus" class="sync-status"></span>
+    </div>
+    <div id="memoList" class="memo-list"></div>
+
+    <!-- 새 메모 버튼 -->
+    <button id="newMemoBtn" class="fab" title="새 메모">＋</button>
+  </section>
+
+  <!-- ───── 메모 편집 화면 (전체 화면) ───── -->
+  <section id="editView" class="edit-view hidden">
+    <header class="top-bar">
+      <button id="editBack" class="icon-btn">‹ 뒤로</button>
+      <div id="editDate" class="top-title"></div>
+      <button id="editDelete" class="icon-btn danger">🗑</button>
+    </header>
+
+    <div class="edit-body">
+      <input id="memoTitle" class="edit-title" type="text" placeholder="제목" />
+      <textarea id="memoBody" class="edit-content" placeholder="내용을 입력하세요..."></textarea>
+      <div id="linkRow" class="link-row"></div>
+      <input id="memoTags" class="edit-tags" type="text"
+             placeholder="태그 (쉼표로 구분: 아이디어, 할일)" />
+
+      <div class="edit-controls">
+        <button id="pinBtn" class="chip-btn">📌 고정</button>
+        <button id="addReminderBtn" class="chip-btn">🔔 알림 추가</button>
+      </div>
+      <div id="reminderRows" class="reminder-rows"></div>
+      <div id="editMeta" class="edit-meta"></div>
+    </div>
+  </section>
+
+  <!-- ───── 메뉴 (아래에서 올라옴) ───── -->
+  <div id="sheet" class="sheet hidden">
+    <div class="sheet-box">
+      <div class="sheet-title">메뉴</div>
+      <button id="menuSync" class="sheet-item">🔄 새로고침 (동기화)</button>
+      <button id="menuReport" class="sheet-item">📄 모아보기</button>
+      <button id="menuSetup" class="sheet-item">⚙️ 연결 설정 바꾸기</button>
+      <button id="menuLogout" class="sheet-item">🚪 로그아웃</button>
+      <button id="sheetClose" class="sheet-item cancel">닫기</button>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+  <script src="config.js"></script>
+  <script src="logic.js"></script>
+  <script src="holidays.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

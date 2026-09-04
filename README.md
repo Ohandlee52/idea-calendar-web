@@ -8,7 +8,9 @@
 
 ### 1단계. Supabase에 표 만들기
 
-1. [supabase.com](https://supabase.com) 로그인 → 프로젝트 선택 (없으면 **New project**로 새로 만들기)
+1. [supabase.com](https://supabase.com) 로그인 → **`ooh-desk` 프로젝트** 선택
+   (다른 앱과 같은 프로젝트를 함께 씁니다. 표·함수 이름을 모두 `idea_` 로 시작하게 해서
+   기존 앱과 섞이지 않도록 만들어 두었습니다.)
 2. 왼쪽 메뉴 **SQL Editor** → **New query**
 3. 이 폴더의 **`supabase-setup.sql`** 내용을 통째로 붙여넣고 **Run**
 4. "Success. No rows returned" 이 나오면 완료

@@ -1,4 +1,4 @@
-// ───────────────────────────────────────────────────────────────
+﻿// ───────────────────────────────────────────────────────────────
 //  아이디어 캘린더 웹앱 (모바일)
 //  · 로그인은 Supabase가 담당하고, 메모는 Supabase 데이터베이스에 저장됩니다.
 //  · 검색·정렬·날짜 계산은 PC 앱과 똑같은 logic.js 를 함께 씁니다.
@@ -141,7 +141,7 @@ function memoToRow(m) {
 
 async function loadMemos() {
   syncStatus.textContent = '불러오는 중…';
-  const { data, error } = await sb.from('memos')
+  const { data, error } = await sb.from('idea_memos')
     .select('*').eq('deleted', false).order('date', { ascending: false });
   if (error) { syncStatus.textContent = '⚠️ 불러오기 실패'; console.error(error); return; }
   allMemos = (data || []).map(rowToMemo);
@@ -150,7 +150,7 @@ async function loadMemos() {
 
 async function saveMemo(memo) {
   syncStatus.textContent = '저장 중…';
-  const { error } = await sb.from('memos').upsert(memoToRow(memo));
+  const { error } = await sb.from('idea_memos').upsert(memoToRow(memo));
   if (error) { syncStatus.textContent = '⚠️ 저장 실패'; console.error(error); return false; }
   syncStatus.textContent = '저장됨 ✓';
   return true;
@@ -158,7 +158,7 @@ async function saveMemo(memo) {
 
 async function deleteMemo(memo) {
   // 지운 표시만 남겨 다른 기기와 동기화해도 되살아나지 않게 합니다.
-  const { error } = await sb.from('memos')
+  const { error } = await sb.from('idea_memos')
     .update({ deleted: true, updated_at: nowISO() }).eq('id', memo.id);
   if (error) { console.error(error); return false; }
   allMemos = Logic.removeById(allMemos, memo.id);

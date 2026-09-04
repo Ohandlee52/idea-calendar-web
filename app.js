@@ -141,10 +141,20 @@ function memoToRow(m) {
 
 async function loadMemos() {
   syncStatus.textContent = '불러오는 중…';
-  const { data, error } = await sb.from('idea_memos')
-    .select('*').eq('deleted', false).order('date', { ascending: false });
-  if (error) { syncStatus.textContent = '⚠️ 불러오기 실패'; console.error(error); return; }
-  allMemos = (data || []).map(rowToMemo);
+  // 서버는 한 번에 최대 1000개만 주므로, 다 받을 때까지 나눠서 가져옵니다.
+  const PAGE = 1000;
+  const rows = [];
+  for (let from = 0; ; from += PAGE) {
+    const { data, error } = await sb.from('idea_memos')
+      .select('*').eq('deleted', false)
+      .order('date', { ascending: false })
+      .range(from, from + PAGE - 1);
+    if (error) { syncStatus.textContent = '⚠️ 불러오기 실패'; console.error(error); return; }
+    rows.push(...(data || []));
+    syncStatus.textContent = `불러오는 중… ${rows.length}개`;
+    if (!data || data.length < PAGE) break;
+  }
+  allMemos = rows.map(rowToMemo);
   syncStatus.textContent = `메모 ${allMemos.length}개`;
 }
 
@@ -526,6 +536,88 @@ $('menuLogout').addEventListener('click', async () => {
 $('menuReport').addEventListener('click', () => {
   sheet.classList.add('hidden');
   openReport();
+});
+
+// ── 📥 PC 메모 가져오기 ──
+// PC 앱의 데이터 파일(idea-calendar-data.json)이나 백업 파일을 골라
+// 폰(Supabase)으로 올립니다. 같은 메모는 "수정 시각이 더 최신인 쪽"만 남깁니다.
+$('menuImport').addEventListener('click', () => {
+  sheet.classList.add('hidden');
+  alert('PC 앱의 메모 파일을 골라주세요.\n\n'
+    + '위치: 구글드라이브 → 아이디어캘린더-데이터 → idea-calendar-data.json\n'
+    + '(또는 PC 앱에서 만든 백업 파일)');
+  $('importFile').click();
+});
+
+$('importFile').addEventListener('change', async (e) => {
+  const file = e.target.files && e.target.files[0];
+  e.target.value = '';                 // 같은 파일을 다시 고를 수 있게 초기화
+  if (!file) return;
+
+  let data;
+  try {
+    data = JSON.parse(await file.text());
+  } catch {
+    alert('파일을 읽지 못했어요.\n메모 파일(.json)이 맞는지 확인해 주세요.');
+    return;
+  }
+  if (!data || !Array.isArray(data.memos)) {
+    alert('메모 파일 형식이 아니에요.\nidea-calendar-data.json 또는 백업 파일을 골라주세요.');
+    return;
+  }
+
+  // PC 앱의 옛 형식(reminderDate)도 새 형식(reminders)으로 맞춰줍니다.
+  const incoming = data.memos.map((m) => {
+    const reminders = Array.isArray(m.reminders) ? m.reminders.map((r) => ({
+      id: String(r.id), date: String(r.date),
+      time: typeof r.time === 'string' ? r.time : null, done: r.done === true,
+    })) : [];
+    if (typeof m.reminderDate === 'string' && m.reminderDate
+        && !reminders.some((r) => r.date === m.reminderDate)) {
+      reminders.push({ id: `${m.id}-r0`, date: m.reminderDate, time: null, done: m.reminderDone === true });
+    }
+    return {
+      id: String(m.id), date: String(m.date),
+      title: m.title || '', body: m.body || '', bodyHtml: m.bodyHtml || '',
+      tags: Array.isArray(m.tags) ? m.tags : [],
+      pinned: m.pinned === true, reminders,
+      createdAt: m.createdAt || nowISO(), updatedAt: m.updatedAt || nowISO(),
+    };
+  });
+
+  // 이미 폰에 있는 메모 중, 더 최신인 것은 덮어쓰지 않습니다.
+  const mine = new Map(allMemos.map((m) => [m.id, m]));
+  const toUpload = incoming.filter((m) => {
+    const cur = mine.get(m.id);
+    return !cur || m.updatedAt > cur.updatedAt;
+  });
+
+  if (toUpload.length === 0) {
+    alert(`가져올 새 메모가 없어요.\n파일의 메모 ${incoming.length}개가 이미 모두 최신 상태입니다.`);
+    return;
+  }
+  if (!confirm(`파일에서 메모 ${incoming.length}개를 찾았어요.\n`
+    + `이 중 ${toUpload.length}개를 가져옵니다.\n\n`
+    + '(이미 폰에 있는 더 최신 메모는 그대로 둡니다)\n계속할까요?')) return;
+
+  // 한 번에 다 보내면 실패할 수 있어 100개씩 나눠 올립니다.
+  syncStatus.textContent = '가져오는 중…';
+  let done = 0;
+  for (let i = 0; i < toUpload.length; i += 100) {
+    const chunk = toUpload.slice(i, i + 100).map(memoToRow);
+    const { error } = await sb.from('idea_memos').upsert(chunk);
+    if (error) {
+      console.error(error);
+      alert(`${done}개까지 가져온 뒤 문제가 생겼어요.\n\n${error.message}`);
+      break;
+    }
+    done += chunk.length;
+    syncStatus.textContent = `가져오는 중… ${done}/${toUpload.length}`;
+  }
+
+  await loadMemos();
+  renderCalendar(); renderList(); checkReminders();
+  alert(`가져오기 완료 ✅\n메모 ${done}개를 가져왔어요.\n지금 총 ${allMemos.length}개입니다.`);
 });
 
 // ── 📄 모아보기 (이번 달 메모를 한 화면에) ──

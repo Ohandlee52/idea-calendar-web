@@ -14,7 +14,7 @@
 
 -- 1) 메모 표 만들기 -------------------------------------------
 create table if not exists public.idea_memos (
-  id          uuid primary key,
+  id          text primary key,   -- PC 앱의 다양한 id 형식을 그대로 받기 위해 text
   user_id     uuid not null references auth.users(id) on delete cascade,
   date        text not null,
   title       text not null default '',

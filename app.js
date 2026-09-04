@@ -543,9 +543,7 @@ $('menuReport').addEventListener('click', () => {
 // 폰(Supabase)으로 올립니다. 같은 메모는 "수정 시각이 더 최신인 쪽"만 남깁니다.
 $('menuImport').addEventListener('click', () => {
   sheet.classList.add('hidden');
-  alert('PC 앱의 메모 파일을 골라주세요.\n\n'
-    + '위치: 구글드라이브 → 아이디어캘린더-데이터 → idea-calendar-data.json\n'
-    + '(또는 PC 앱에서 만든 백업 파일)');
+  // 안내창을 거치면 브라우저가 파일 선택창을 막으므로, 곧바로 엽니다.
   $('importFile').click();
 });
 

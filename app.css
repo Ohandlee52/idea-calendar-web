@@ -353,6 +353,13 @@ body {
 }
 .sheet-item:active { background: var(--primary-soft); }
 .sheet-item.cancel { text-align: center; color: var(--text-soft); margin-top: 4px; }
+.sheet-sub {
+  display: block;
+  font-size: 12px;
+  color: var(--text-soft);
+  margin-top: 2px;
+  word-break: break-all;
+}
 
 /* ── 넓은 화면(태블릿·PC 브라우저)에서는 가운데 정렬 ── */
 @media (min-width: 640px) {

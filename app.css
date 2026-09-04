@@ -218,8 +218,9 @@ body {
   cursor: pointer;
 }
 .day.blank { cursor: default; }
-.day.sun, .day.holiday { color: var(--sun); }
+.day.sun { color: var(--sun); }
 .day.sat { color: var(--sat); }
+.day.holiday { color: var(--sun); }  /* 공휴일은 토요일이어도 빨간색 */
 .day.today { background: var(--today); font-weight: 800; }
 .day.selected { background: var(--primary); color: #fff; font-weight: 800; }
 .day.selected.sun, .day.selected.sat, .day.selected.holiday { color: #fff; }

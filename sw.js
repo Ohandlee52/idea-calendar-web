@@ -3,7 +3,8 @@
 //  인터넷이 느리거나 잠깐 끊겨도 앱이 바로 열리게 합니다.
 //  (메모 내용은 Supabase에서 받아오므로 인터넷이 필요합니다)
 // ───────────────────────────────────────────────────────────────
-const CACHE = 'idea-calendar-v1';
+// 버전을 올리면 예전에 저장해둔 파일이 모두 지워지고 새로 받습니다.
+const CACHE = 'idea-calendar-v3';
 const FILES = [
   './', './index.html', './app.css', './app.js',
   './logic.js', './holidays.js', './config.js', './manifest.json',

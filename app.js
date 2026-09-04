@@ -18,6 +18,9 @@ function readConfig() {
   }
   return null;
 }
+// 앱 버전 (배포할 때마다 올립니다 — 폰이 새 코드를 받았는지 확인용)
+const APP_VERSION = '1.2.0';
+
 const conf = readConfig();
 const configured = !!conf;
 const sb = configured ? window.supabase.createClient(conf.url, conf.key) : null;
@@ -522,7 +525,27 @@ $('editDelete').addEventListener('click', async () => {
 });
 
 // 메뉴
-$('menuBtn').addEventListener('click', () => sheet.classList.remove('hidden'));
+$('menuBtn').addEventListener('click', () => {
+  $('sheetTitle').textContent = `메뉴 · v${APP_VERSION}`;
+  sheet.classList.remove('hidden');
+});
+
+// 앱을 최신 코드로 다시 받기 (저장해둔 파일을 지우고 새로 내려받습니다)
+$('menuUpdate').addEventListener('click', async () => {
+  sheet.classList.add('hidden');
+  try {
+    if ('serviceWorker' in navigator) {
+      const regs = await navigator.serviceWorker.getRegistrations();
+      await Promise.all(regs.map((r) => r.unregister()));
+    }
+    if (window.caches) {
+      const keys = await caches.keys();
+      await Promise.all(keys.map((k) => caches.delete(k)));
+    }
+  } catch (e) { console.error(e); }
+  alert('최신 버전을 받아옵니다. 화면이 다시 시작됩니다.');
+  location.reload(true);
+});
 $('sheetClose').addEventListener('click', () => sheet.classList.add('hidden'));
 sheet.addEventListener('click', (e) => { if (e.target === sheet) sheet.classList.add('hidden'); });
 $('menuSync').addEventListener('click', async () => {
@@ -734,7 +757,16 @@ $('menuSetup').addEventListener('click', () => { sheet.classList.add('hidden'); 
 // ── 시작 ──
 (async function init() {
   // 서비스 워커 등록 (홈 화면 설치용)
-  if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+  if ('serviceWorker' in navigator) {
+    try {
+      const reg = await navigator.serviceWorker.register('sw.js');
+      reg.update();                                   // 새 버전 있는지 바로 확인
+      // 새 버전이 준비되면 다음 실행 때 자동 적용되도록 합니다.
+      navigator.serviceWorker.addEventListener('controllerchange', () => {
+        if (!window.__reloadedForUpdate) { window.__reloadedForUpdate = true; location.reload(); }
+      });
+    } catch { /* 무시 */ }
+  }
 
   if (!configured) { openSetup(); return; }   // 아직 연결 정보가 없으면 설정부터
 

@@ -126,12 +126,20 @@ async function enterApp() {
 
 // ── 데이터 불러오기 / 저장 ──
 // 데이터베이스의 항목 이름(snake_case)을 앱에서 쓰는 이름으로 바꿔줍니다.
+// 서버 시각("...+00:00")과 앱 시각("...Z") 형식을 통일합니다.
+// 안 그러면 같은 시각인데도 다르게 판단해 매번 전부 다시 올리게 됩니다.
+function toIso(v) {
+  if (!v) return v;
+  const d = new Date(v);
+  return isNaN(d.getTime()) ? String(v) : d.toISOString();
+}
+
 function rowToMemo(r) {
   return {
     id: r.id, date: r.date, title: r.title || '', body: r.body || '',
     bodyHtml: r.body_html || '', tags: r.tags || [], pinned: !!r.pinned,
     reminders: Array.isArray(r.reminders) ? r.reminders : [],
-    createdAt: r.created_at, updatedAt: r.updated_at,
+    createdAt: toIso(r.created_at), updatedAt: toIso(r.updated_at),
   };
 }
 function memoToRow(m) {

@@ -573,7 +573,9 @@ document.addEventListener('visibilitychange', () => { if (!document.hidden) chec
 
 // ── 연결 설정 화면 ──
 function openSetup() {
-  $('setupUrl').value = localStorage.getItem('sbUrl') || '';
+  // 내 프로젝트 주소를 미리 채워둡니다 (다른 프로젝트를 쓰려면 고치면 돼요)
+  $('setupUrl').value = localStorage.getItem('sbUrl')
+    || 'https://bbqdyuvycumaxryyapbk.supabase.co';
   $('setupKey').value = localStorage.getItem('sbKey') || '';
   $('setupView').classList.remove('hidden');
   $('loginView').classList.add('hidden');

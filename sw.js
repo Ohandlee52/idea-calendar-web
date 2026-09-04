@@ -26,8 +26,10 @@ self.addEventListener('fetch', (e) => {
   const url = new URL(e.request.url);
   // 앱 화면 파일만 저장본을 씁니다. (데이터 요청은 항상 인터넷으로)
   if (e.request.method !== 'GET' || url.origin !== self.location.origin) return;
+  // cache: 'reload' → 브라우저가 저장해둔 옛 파일을 건너뛰고 항상 새로 받아옵니다.
+  // (앱을 새로 배포했을 때 폰이 옛 화면에 머무는 문제를 막아줍니다)
   e.respondWith(
-    fetch(e.request)
+    fetch(new Request(e.request, { cache: 'reload' }))
       .then((res) => {
         const copy = res.clone();
         caches.open(CACHE).then((c) => c.put(e.request, copy));

@@ -50,7 +50,10 @@
 
     <header class="top-bar">
       <button id="menuBtn" class="icon-btn" title="메뉴">☰</button>
-      <div id="topTitle" class="top-title">아이디어 캘린더</div>
+      <button id="topTitle" class="top-title-btn" title="달력 펼치기/접기"
+              aria-expanded="false" aria-controls="calendarWrap">
+        <span id="topTitleText">날짜를 선택하세요</span><span class="caret">▾</span>
+      </button>
       <button id="searchBtn" class="icon-btn" title="검색">🔍</button>
     </header>
 
@@ -64,7 +67,7 @@
     <div id="reminderBar" class="reminder-bar hidden"></div>
 
     <!-- 달력 -->
-    <div id="calendarWrap" class="calendar-wrap">
+    <div id="calendarWrap" class="calendar-wrap collapsed">
       <div class="cal-head">
         <button id="prevMonth" class="icon-btn">‹</button>
         <div id="monthLabel" class="month-label">0000년 0월</div>
@@ -78,9 +81,14 @@
       <div id="daysGrid" class="days-grid"></div>
     </div>
 
+    <!-- 바로 쓰기 -->
+    <button id="quickAdd" class="quick-add">
+      <span class="qa-plus">＋</span><span class="qa-text">무엇이 떠올랐나요?</span>
+    </button>
+
     <!-- 메모 목록 -->
     <div class="list-head">
-      <h2 id="listTitle">날짜를 선택하세요</h2>
+      <h2 id="listTitle" class="list-sub">날짜를 선택하세요</h2>
       <span id="syncStatus" class="sync-status"></span>
     </div>
     <div id="memoList" class="memo-list"></div>

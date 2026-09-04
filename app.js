@@ -19,7 +19,7 @@ function readConfig() {
   return null;
 }
 // 앱 버전 (배포할 때마다 올립니다 — 폰이 새 코드를 받았는지 확인용)
-const APP_VERSION = '1.2.0';
+const APP_VERSION = '1.3.0';
 
 const conf = readConfig();
 const configured = !!conf;
@@ -30,6 +30,7 @@ const $ = (id) => document.getElementById(id);
 const loginView = $('loginView'), mainView = $('mainView'), editView = $('editView');
 const loginEmail = $('loginEmail'), loginPw = $('loginPw'), loginMsg = $('loginMsg');
 const monthLabel = $('monthLabel'), daysGrid = $('daysGrid');
+const calendarWrap = $('calendarWrap'), topTitleBtn = $('topTitle'), topTitleText = $('topTitleText');
 const listTitle = $('listTitle'), memoList = $('memoList'), syncStatus = $('syncStatus');
 const searchBar = $('searchBar'), searchInput = $('searchInput');
 const reminderBar = $('reminderBar');
@@ -42,6 +43,9 @@ const sheet = $('sheet');
 let user = null;
 let allMemos = [];
 let viewYear, viewMonth, selectedKey = null;
+// 폰에서는 달력을 한 줄(주간)로 접어 두고, 필요할 때만 펼친다.
+// 이 앱은 달력이 아니라 메모장이므로 기본은 접힘이다.
+let calExpanded = false;
 let current = null, currentIsNew = false;
 let searchQuery = '';
 let saveTimer = null;
@@ -188,31 +192,55 @@ async function deleteMemo(memo) {
 }
 
 // ── 달력 ──
+/** 접힘 상태에서 보여줄 한 주(일~토)의 Date 7개 */
+function weekOfSelected() {
+  const base = selectedKey ? new Date(selectedKey + 'T00:00:00')
+                           : new Date(viewYear, viewMonth, 1);
+  const sunday = new Date(base);
+  sunday.setDate(base.getDate() - base.getDay());
+  return Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(sunday); d.setDate(sunday.getDate() + i); return d;
+  });
+}
+
 function renderCalendar() {
   monthLabel.textContent = `${viewYear}년 ${viewMonth + 1}월`;
+  calendarWrap.classList.toggle('collapsed', !calExpanded);
+  topTitleBtn.setAttribute('aria-expanded', calExpanded ? 'true' : 'false');
+
   const countByDate = {}, reminderDates = new Set();
   for (const m of allMemos) {
     countByDate[m.date] = (countByDate[m.date] || 0) + 1;
     for (const r of (m.reminders || [])) if (!r.done) reminderDates.add(r.date);
   }
-  const firstDay = new Date(viewYear, viewMonth, 1).getDay();
-  const lastDate = new Date(viewYear, viewMonth + 1, 0).getDate();
   const t = todayObj();
   daysGrid.innerHTML = '';
 
-  for (let i = 0; i < firstDay; i++) {
-    const b = document.createElement('div'); b.className = 'day blank';
-    daysGrid.appendChild(b);
+  // 접힘: 선택한 날짜가 든 주 7칸만. 펼침: 기존 월간 격자.
+  const days = calExpanded
+    ? monthDays()
+    : weekOfSelected().map((d) => ({ y: d.getFullYear(), m: d.getMonth(), d: d.getDate() }));
+
+  if (calExpanded) {
+    const firstDay = new Date(viewYear, viewMonth, 1).getDay();
+    for (let i = 0; i < firstDay; i++) {
+      const b = document.createElement('div'); b.className = 'day blank';
+      daysGrid.appendChild(b);
+    }
   }
-  for (let d = 1; d <= lastDate; d++) {
-    const key = dateKey(viewYear, viewMonth, d);
+
+  for (const item of days) {
+    const { y, m: mo, d } = item;
+    const key = dateKey(y, mo, d);
     const cell = document.createElement('div');
     cell.className = 'day';
-    const wd = new Date(viewYear, viewMonth, d).getDay();
+    // 접힘 상태에서 이번 달이 아닌 날은 흐리게
+    if (!calExpanded && mo !== viewMonth) cell.classList.add('other-month');
+    const wd = new Date(y, mo, d).getDay();
     if (wd === 0) cell.classList.add('sun');
     if (wd === 6) cell.classList.add('sat');
     if (Holidays.getHoliday(key)) cell.classList.add('holiday');
-    if (viewYear === t.y && viewMonth === t.m && d === t.d) cell.classList.add('today');
+    if (y === t.y && mo === t.m && d === t.d) cell.classList.add('today');
     if (key === selectedKey) cell.classList.add('selected');
 
     const num = document.createElement('span');
@@ -234,6 +262,12 @@ function renderCalendar() {
     cell.addEventListener('click', () => selectDate(key));
     daysGrid.appendChild(cell);
   }
+}
+
+/** 펼침 상태에서 쓰는 이번 달 전체 날짜 */
+function monthDays() {
+  const lastDate = new Date(viewYear, viewMonth + 1, 0).getDate();
+  return Array.from({ length: lastDate }, (_, i) => ({ y: viewYear, m: viewMonth, d: i + 1 }));
 }
 
 function selectDate(key) {
@@ -266,6 +300,7 @@ function renderList() {
 
   if (searchQuery.trim()) {
     listTitle.textContent = '🔍 검색 결과';
+    topTitleText.textContent = '검색 결과';
     const found = Logic.sortForSearch(
       allMemos.filter((m) => Logic.matchMemo(m, searchQuery)), 'date');
     if (found.length === 0) {
@@ -281,6 +316,8 @@ function renderList() {
   const wd = WEEK[new Date(y, m - 1, d).getDay()];
   const hol = Holidays.getHoliday(selectedKey);
   listTitle.textContent = `${m}월 ${d}일 (${wd})${hol ? ' · ' + hol : ''}`;
+  // 상단 제목이 곧 날짜다. 앱 이름은 사용자가 이미 아는 정보라 자리를 내준다.
+  topTitleText.textContent = `${m}월 ${d}일 (${wd})`;
 
   // 고정 메모는 날짜와 상관없이 항상 위에
   const pinned = Logic.sortForDay(allMemos.filter((x) => x.pinned));
@@ -470,6 +507,19 @@ function moveMonth(step) {
   if (viewMonth > 11) { viewMonth = 0; viewYear++; }
   renderCalendar();
 }
+
+/** 접힘 상태에서 주 단위로 이동한다 */
+function moveWeek(step) {
+  const base = selectedKey ? new Date(selectedKey + 'T00:00:00') : new Date();
+  base.setDate(base.getDate() + step * 7);
+  viewYear = base.getFullYear(); viewMonth = base.getMonth();
+  selectDate(dateKey(base.getFullYear(), base.getMonth(), base.getDate()));
+}
+
+function toggleCalendar() {
+  calExpanded = !calExpanded;
+  renderCalendar();
+}
 function goToday() {
   const t = todayObj();
   viewYear = t.y; viewMonth = t.m;
@@ -485,6 +535,23 @@ $('prevMonth').addEventListener('click', () => moveMonth(-1));
 $('nextMonth').addEventListener('click', () => moveMonth(1));
 $('todayBtn').addEventListener('click', goToday);
 $('newMemoBtn').addEventListener('click', newMemo);
+$('quickAdd').addEventListener('click', newMemo);
+topTitleBtn.addEventListener('click', toggleCalendar);
+
+// 달력을 좌우로 밀어 이동한다. 접힘이면 주 단위, 펼침이면 달 단위.
+let swipeX = null, swipeY = null;
+calendarWrap.addEventListener('touchstart', (e) => {
+  const t = e.changedTouches[0]; swipeX = t.clientX; swipeY = t.clientY;
+}, { passive: true });
+calendarWrap.addEventListener('touchend', (e) => {
+  if (swipeX === null) return;
+  const t = e.changedTouches[0];
+  const dx = t.clientX - swipeX, dy = t.clientY - swipeY;
+  swipeX = swipeY = null;
+  if (Math.abs(dx) < 50 || Math.abs(dx) < Math.abs(dy)) return;  // 세로 스크롤과 헷갈리지 않게
+  const step = dx < 0 ? 1 : -1;
+  calExpanded ? moveMonth(step) : moveWeek(step);
+}, { passive: true });
 
 $('searchBtn').addEventListener('click', () => {
   searchBar.classList.toggle('hidden');

@@ -12,6 +12,6 @@
 //     (실제 보호는 Supabase의 보안 규칙(RLS)이 담당합니다)
 // ───────────────────────────────────────────────────────────────
 window.APP_CONFIG = {
-  SUPABASE_URL: 'https://여기에-내-프로젝트-주소.supabase.co',
-  SUPABASE_KEY: '여기에-anon-공개키',
+  SUPABASE_URL: 'https://bbqdyuvycumaxryyapbk.supabase.co',
+  SUPABASE_KEY: 'sb_publishable_-AiDRAAkNwqLAFMum3VmUw_E451PUJ3',
 };

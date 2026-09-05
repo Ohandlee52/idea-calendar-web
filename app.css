@@ -121,8 +121,18 @@ body {
   min-height: 40px;
   cursor: pointer;
 }
-.top-title-btn .caret { font-size: 11px; color: var(--text-soft); transition: transform .15s; }
-.top-title-btn[aria-expanded="true"] .caret { transform: rotate(180deg); }
+/* 세모는 "다음에 누르면 무엇이 되는지"를 가리킨다.
+   주 → 월, 월 → 년 은 둘 다 펼치는 것이므로 아래(▾),
+   년 → 주 만 접는 것이므로 위(▴)로 뒤집는다.
+   펼침 여부(aria-expanded)로 뒤집으면 월간에서 위를 가리키는데
+   실제로는 연간으로 더 펼쳐져 방향이 거꾸로가 된다. */
+.top-title-btn .caret {
+  font-size: 15px;
+  line-height: 1;
+  color: var(--primary);
+  transition: transform .15s;
+}
+.top-title-btn[data-mode="year"] .caret { transform: rotate(180deg); }
 
 /* 바로 쓰기 줄 — 달력 바로 아래에 붙어 스크롤해도 사라지지 않는다.
    아이디어 메모장이므로 "떠오르면 바로 친다"가 가장 짧은 길이어야 한다. */

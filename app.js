@@ -19,7 +19,7 @@ function readConfig() {
   return null;
 }
 // 앱 버전 (배포할 때마다 올립니다 — 폰이 새 코드를 받았는지 확인용)
-const APP_VERSION = '1.5.2';
+const APP_VERSION = '1.6.0';
 
 const conf = readConfig();
 const configured = !!conf;
@@ -48,6 +48,8 @@ let viewYear, viewMonth, selectedKey = null;
 let calMode = 'week';   // 'week' | 'month' | 'year'
 // 일괄 삭제용 선택. id 만 담는다.
 const selectedIds = new Set();
+// 고정 메모는 기본 8개까지만 타일로 보여 준다. 나머지는 눌러서 펼친다.
+let pinnedExpanded = false;
 let current = null, currentIsNew = false;
 let searchQuery = '';
 let saveTimer = null;
@@ -326,6 +328,68 @@ function memoCard(memo, showDate) {
   return card;
 }
 
+const PIN_MAX = 8;   // 기본으로 보여 주는 고정 메모 개수
+
+// 고정 메모 머리말. 8개가 넘으면 펼치기 단추가 붙는다.
+function pinnedHead(total) {
+  const h = document.createElement('div');
+  h.className = 'section-title pin-head';
+  h.innerHTML = '<span>📌 고정된 메모</span>';
+  if (total > PIN_MAX) {
+    const more = document.createElement('button');
+    more.type = 'button';
+    more.className = 'pin-more';
+    more.textContent = pinnedExpanded ? '접기' : `＋${total - PIN_MAX}개 더`;
+    more.addEventListener('click', () => { pinnedExpanded = !pinnedExpanded; renderList(); });
+    h.appendChild(more);
+  }
+  return h;
+}
+
+// 고정 메모를 제목만 담은 작은 타일 격자로 그린다.
+// 카드로 그리면 3개만으로도 화면 절반을 먹어 정작 오늘 메모가 안 보인다.
+// 칸 수는 개수에 맞춘다: 4개까지는 한 줄, 5개부터는 두 줄로 나눈다.
+function pinnedGrid(pinned) {
+  const shown = pinnedExpanded ? pinned : pinned.slice(0, PIN_MAX);
+  const cols = shown.length <= 4 ? shown.length : Math.ceil(shown.length / 2);
+  const grid = document.createElement('div');
+  grid.className = 'pin-grid';
+  grid.style.gridTemplateColumns = `repeat(${Math.min(cols, 4)}, minmax(0, 1fr))`;
+
+  for (const memo of shown) {
+    const tile = document.createElement('div');
+    tile.className = 'pin-tile';
+    const bell = (memo.reminders || []).some((r) => !r.done) ? ' 🔔' : '';
+    const title = memo.title.trim() || '(제목 없음)';
+    tile.innerHTML = `<span class="pin-title">${Logic.escapeHtml(title)}${bell}</span>`;
+    tile.title = title;
+
+    // 고정 메모도 골라서 지울 수 있어야 한다. 체크칸을 모서리에 둔다.
+    const check = document.createElement('button');
+    check.className = 'memo-check';
+    check.type = 'button';
+    check.setAttribute('role', 'checkbox');
+    const sync = () => {
+      const on = selectedIds.has(memo.id);
+      check.classList.toggle('on', on);
+      check.setAttribute('aria-checked', on ? 'true' : 'false');
+      check.setAttribute('aria-label', on ? '선택 해제' : '선택');
+      tile.classList.toggle('picked', on);
+    };
+    check.addEventListener('click', (e) => {
+      e.stopPropagation();
+      selectedIds.has(memo.id) ? selectedIds.delete(memo.id) : selectedIds.add(memo.id);
+      sync();
+      renderSelectBar();
+    });
+    tile.appendChild(check);
+    tile.addEventListener('click', () => openMemo(memo));
+    sync();
+    grid.appendChild(tile);
+  }
+  return grid;
+}
+
 function renderList() {
   memoList.innerHTML = '';
 
@@ -356,10 +420,8 @@ function renderList() {
     allMemos.filter((x) => x.date === selectedKey && !x.pinned));
 
   if (pinned.length) {
-    const h = document.createElement('div');
-    h.className = 'section-title'; h.textContent = '📌 고정된 메모';
-    memoList.appendChild(h);
-    for (const x of pinned) memoList.appendChild(memoCard(x, true));
+    memoList.appendChild(pinnedHead(pinned.length));
+    memoList.appendChild(pinnedGrid(pinned));
     const h2 = document.createElement('div');
     h2.className = 'section-title'; h2.textContent = '🗓 이 날짜의 메모';
     memoList.appendChild(h2);

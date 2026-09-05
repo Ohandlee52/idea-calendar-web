@@ -404,6 +404,45 @@ body {
 }
 .sb-btn.danger { background: #e5484d; border-color: #e5484d; font-weight: 800; }
 .section-title { font-size: 12px; font-weight: 700; color: var(--text-soft); margin-top: 6px; }
+
+/* 고정 메모 타일 격자 — 제목만 담은 작은 칸.
+   높이를 고정한다. aspect-ratio:1(정사각형)로 두면 고정 메모가 2개일 때
+   칸이 180px 짜리로 커져 오히려 화면을 더 잡아먹는다. */
+.pin-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.pin-more {
+  border: 0; background: none; padding: 2px 0;
+  font-size: 12px; font-weight: 700; color: var(--primary);
+  font-family: inherit; cursor: pointer;
+}
+.pin-grid { display: grid; gap: 6px; }
+.pin-tile {
+  position: relative;
+  min-height: 60px;
+  padding: 8px 24px 8px 9px;   /* 오른쪽은 체크칸 자리 */
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--card);
+  cursor: pointer;
+  overflow: hidden;
+}
+.pin-title {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  font-size: 12.5px;
+  font-weight: 700;
+  line-height: 1.3;
+  color: var(--text);
+  /* 한글은 낱말 단위로 넘기고, 낱말 하나가 칸보다 길 때만 쪼갠다.
+     break-all 로 두면 'Supab / ase' 처럼 아무 데서나 끊긴다. */
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+}
+.pin-tile.picked { border-color: var(--primary); background: var(--primary-soft); }
+/* 체크칸은 모서리에 붙인다. 목록 카드와 같은 모양을 쓴다 */
+.pin-tile .memo-check { position: absolute; top: 0; right: 0; margin: 0; padding: 5px; }
+.pin-tile .memo-check.on::after { left: 5px; top: 5px; }
 .memo-card {
   background: var(--card);
   border: 1px solid var(--border);

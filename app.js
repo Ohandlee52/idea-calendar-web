@@ -19,7 +19,7 @@ function readConfig() {
   return null;
 }
 // 앱 버전 (배포할 때마다 올립니다 — 폰이 새 코드를 받았는지 확인용)
-const APP_VERSION = '1.6.1';
+const APP_VERSION = '1.6.2';
 
 const conf = readConfig();
 const configured = !!conf;
@@ -159,8 +159,21 @@ function memoToRow(m) {
   };
 }
 
+// 끝난 일을 알리는 글은 잠깐만 보여 주고 지운다.
+// 그대로 두면 늘 붙어 있는 배경 글자가 되어 자리만 차지한다.
+let syncClearTimer = null;
+function syncFlash(text, ms = 2000) {
+  syncStatus.textContent = text;
+  clearTimeout(syncClearTimer);
+  syncClearTimer = setTimeout(() => { syncStatus.textContent = ''; }, ms);
+}
+function syncBusy(text) {           // 진행 중인 일은 끝날 때까지 남긴다
+  clearTimeout(syncClearTimer);
+  syncStatus.textContent = text;
+}
+
 async function loadMemos() {
-  syncStatus.textContent = '불러오는 중…';
+  syncBusy('불러오는 중…');
   // 서버는 한 번에 최대 1000개만 주므로, 다 받을 때까지 나눠서 가져옵니다.
   const PAGE = 1000;
   const rows = [];
@@ -169,20 +182,20 @@ async function loadMemos() {
       .select('*').eq('deleted', false)
       .order('date', { ascending: false })
       .range(from, from + PAGE - 1);
-    if (error) { syncStatus.textContent = '⚠️ 불러오기 실패'; console.error(error); return; }
+    if (error) { syncBusy('⚠️ 불러오기 실패'); console.error(error); return; }
     rows.push(...(data || []));
-    syncStatus.textContent = `불러오는 중… ${rows.length}개`;
+    syncBusy(`불러오는 중… ${rows.length}개`);
     if (!data || data.length < PAGE) break;
   }
   allMemos = rows.map(rowToMemo);
-  syncStatus.textContent = `메모 ${allMemos.length}개`;
+  syncStatus.textContent = '';
 }
 
 async function saveMemo(memo) {
-  syncStatus.textContent = '저장 중…';
+  syncBusy('저장 중…');
   const { error } = await sb.from('idea_memos').upsert(memoToRow(memo));
-  if (error) { syncStatus.textContent = '⚠️ 저장 실패'; console.error(error); return false; }
-  syncStatus.textContent = '저장됨 ✓';
+  if (error) { syncBusy('⚠️ 저장 실패'); console.error(error); return false; }
+  syncFlash('저장됨 ✓');
   return true;
 }
 
@@ -529,7 +542,7 @@ function renderReminderRows() {
 
 // ── 자동 저장 ──
 function scheduleSave() {
-  syncStatus.textContent = '입력 중…';
+  syncBusy('입력 중…');
   if (saveTimer) clearTimeout(saveTimer);
   saveTimer = setTimeout(commitCurrent, 900);
 }
@@ -723,7 +736,7 @@ $('selectDelete').addEventListener('click', async () => {
   if (!confirm(`메모 ${ids.length}개를 지울까요? 되돌릴 수 없습니다.`)) return;
 
   const targets = allMemos.filter((m) => ids.includes(m.id));
-  syncStatus.textContent = '삭제 중…';
+  syncBusy('삭제 중…');
   let failed = 0;
   for (const m of targets) {
     const ok = await deleteMemo(m);
@@ -733,9 +746,8 @@ $('selectDelete').addEventListener('click', async () => {
   renderSelectBar();
   renderCalendar(); renderList();
   // 일부만 지워졌으면 조용히 넘어가지 않는다
-  syncStatus.textContent = failed
-    ? `⚠️ ${targets.length - failed}개 삭제, ${failed}개 실패`
-    : `${targets.length}개 삭제됨 ✓`;
+  if (failed) syncBusy(`⚠️ ${targets.length - failed}개 삭제, ${failed}개 실패`);
+  else syncFlash(`${targets.length}개 삭제됨 ✓`);
 });
 
 // 상단바 높이를 재서 작성칸이 그 아래에 정확히 붙게 한다.
@@ -917,7 +929,7 @@ $('importFile').addEventListener('change', async (e) => {
     + '(이미 폰에 있는 더 최신 메모는 그대로 둡니다)\n계속할까요?')) return;
 
   // 한 번에 다 보내면 실패할 수 있어 100개씩 나눠 올립니다.
-  syncStatus.textContent = '가져오는 중…';
+  syncBusy('가져오는 중…');
   let done = 0;
   for (let i = 0; i < toUpload.length; i += 100) {
     const chunk = toUpload.slice(i, i + 100).map(memoToRow);
@@ -928,7 +940,7 @@ $('importFile').addEventListener('change', async (e) => {
       break;
     }
     done += chunk.length;
-    syncStatus.textContent = `가져오는 중… ${done}/${toUpload.length}`;
+    syncBusy(`가져오는 중… ${done}/${toUpload.length}`);
   }
 
   await loadMemos();

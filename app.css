@@ -169,6 +169,14 @@ body {
   font-weight: 800;
   padding: 0 14px;
 }
+/* 그림기호(⤢)는 무슨 뜻인지 알기 어려워 글자로 바꿨다 */
+.qa-expand {
+  padding: 0 12px;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--primary);
+  border-color: var(--primary);
+}
 .list-sub { font-size: 13px; font-weight: 700; color: var(--text-soft); }
 
 .top-title {

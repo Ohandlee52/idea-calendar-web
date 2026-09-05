@@ -19,7 +19,7 @@ function readConfig() {
   return null;
 }
 // 앱 버전 (배포할 때마다 올립니다 — 폰이 새 코드를 받았는지 확인용)
-const APP_VERSION = '1.6.3';
+const APP_VERSION = '1.6.4';
 
 const conf = readConfig();
 const configured = !!conf;
@@ -28,7 +28,7 @@ const sb = configured ? window.supabase.createClient(conf.url, conf.key) : null;
 // 화면 요소
 const $ = (id) => document.getElementById(id);
 const loginView = $('loginView'), mainView = $('mainView'), editView = $('editView');
-const loginEmail = $('loginEmail'), loginPw = $('loginPw'), loginMsg = $('loginMsg');
+const loginEmail = $('loginEmail'), loginPw = $('loginPw'), loginInvite = $('loginInvite'), loginMsg = $('loginMsg');
 const resetView = $('resetView'), resetPw = $('resetPw'), resetPw2 = $('resetPw2'), resetMsg = $('resetMsg');
 const monthLabel = $('monthLabel'), daysGrid = $('daysGrid');
 const calendarWrap = $('calendarWrap'), topTitleBtn = $('topTitle'), topTitleText = $('topTitleText');
@@ -94,11 +94,19 @@ async function doSignup() {
   if (!sb) { showLoginMsg('연결 설정(config.js)이 아직 안 됐어요.', 'error'); return; }
   const email = loginEmail.value.trim();
   const password = loginPw.value;
+  const inviteCode = loginInvite.value.trim();
   if (!email || password.length < 6) {
     showLoginMsg('이메일과 6자 이상 비밀번호를 입력해 주세요.', 'error'); return;
   }
+  if (!inviteCode) { showLoginMsg('초대코드를 입력해 주세요.', 'error'); return; }
   showLoginMsg('계정 만드는 중…');
-  const { data, error } = await sb.auth.signUp({ email, password });
+  // 초대코드는 user_metadata 로 넘긴다. 실제 검사는 데이터베이스 쪽
+  // 트리거(idea_check_invite_code)가 한다 — 여기서만 확인하면
+  // 개발자도구로 이 함수를 건너뛰어 우회할 수 있기 때문이다.
+  const { data, error } = await sb.auth.signUp({
+    email, password,
+    options: { data: { invite_code: inviteCode } },
+  });
   if (error) { showLoginMsg(translateAuthError(error.message), 'error'); return; }
   if (data.session) { user = data.user; await enterApp(); }
   else showLoginMsg('가입 확인 메일을 보냈어요. 메일의 링크를 누른 뒤 로그인해 주세요.', 'ok');
@@ -152,6 +160,8 @@ function translateAuthError(msg) {
   if (m.includes('email not confirmed')) return '메일함에서 가입 확인 링크를 먼저 눌러주세요.';
   if (m.includes('same password') || m.includes('different from the old'))
     return '이전과 다른 비밀번호를 입력해 주세요.';
+  if (m.includes('database error saving new user'))
+    return '초대코드가 올바르지 않거나 이미 사용됐어요. 코드를 다시 확인해 주세요.';
   if (m.includes('password')) return '비밀번호는 6자 이상이어야 해요.';
   if (m.includes('failed to fetch')) return '인터넷 연결을 확인해 주세요.';
   if (m.includes('rate limit') || m.includes('security purposes'))

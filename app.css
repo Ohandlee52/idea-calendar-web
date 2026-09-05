@@ -286,6 +286,28 @@ body {
   cursor: pointer;
 }
 .day.blank { cursor: default; }
+/* ── 연간 달력 ── */
+.calendar-wrap.year-mode .weekdays { display: none; }
+.calendar-wrap.year-mode .days-grid { grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.year-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  min-height: 58px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--card);
+  color: var(--text);
+  cursor: pointer;
+}
+.year-cell .ym { font-size: 15px; font-weight: 800; }
+.year-cell .yc { font-size: 12px; color: var(--primary); font-weight: 700; }
+.year-cell .yc.dim { color: var(--text-soft); font-weight: 400; }
+.year-cell.today { background: var(--today); }
+.year-cell.selected { border-color: var(--primary); border-width: 2px; }
+
 /* 접힘 상태에서 이번 달이 아닌 날 */
 .day.other-month { opacity: .45; }
 .day.sun { color: var(--sun); }
@@ -309,6 +331,52 @@ body {
 .sync-status { font-size: 12px; color: var(--text-soft); }
 
 .memo-list { padding: 0 12px; display: flex; flex-direction: column; gap: 8px; }
+/* 체크칸 + 카드 한 줄 */
+.memo-row { display: flex; align-items: stretch; gap: 8px; }
+.memo-row .memo-card { flex: 1; min-width: 0; }
+.memo-check {
+  flex: 0 0 auto;
+  align-self: center;
+  width: 30px; height: 30px;
+  border: 2px solid var(--border);
+  border-radius: 9px;
+  background: var(--card);
+  color: #fff;
+  font-size: 17px;
+  font-weight: 800;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0;
+}
+.memo-check.on { background: var(--primary); border-color: var(--primary); }
+.memo-row.picked .memo-card { border-color: var(--primary); }
+
+/* 선택 삭제 막대 */
+.select-bar {
+  position: fixed;
+  left: 12px; right: 12px;
+  bottom: calc(16px + var(--safe-bottom));
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: var(--text);
+  box-shadow: 0 6px 20px rgba(0,0,0,.28);
+}
+.sb-count { flex: 1; color: #fff; font-size: 15px; font-weight: 800; }
+.sb-btn {
+  border: 1px solid rgba(255,255,255,.35);
+  background: transparent;
+  color: #fff;
+  border-radius: 10px;
+  padding: 9px 16px;
+  font-size: 15px;
+  min-height: 42px;
+  cursor: pointer;
+}
+.sb-btn.danger { background: #e5484d; border-color: #e5484d; font-weight: 800; }
 .section-title { font-size: 12px; font-weight: 700; color: var(--text-soft); margin-top: 6px; }
 .memo-card {
   background: var(--card);

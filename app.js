@@ -19,7 +19,7 @@ function readConfig() {
   return null;
 }
 // 앱 버전 (배포할 때마다 올립니다 — 폰이 새 코드를 받았는지 확인용)
-const APP_VERSION = '1.4.0';
+const APP_VERSION = '1.5.0';
 
 const conf = readConfig();
 const configured = !!conf;
@@ -43,9 +43,11 @@ const sheet = $('sheet');
 let user = null;
 let allMemos = [];
 let viewYear, viewMonth, selectedKey = null;
-// 폰에서는 달력을 한 줄(주간)로 접어 두고, 필요할 때만 펼친다.
-// 이 앱은 달력이 아니라 메모장이므로 기본은 접힘이다.
-let calExpanded = false;
+// 달력은 3단이다: 주간(기본) → 월간 → 연간 → 다시 주간.
+// 이 앱은 달력이 아니라 메모장이므로 기본은 가장 좁은 주간이다.
+let calMode = 'week';   // 'week' | 'month' | 'year'
+// 일괄 삭제용 선택. id 만 담는다.
+const selectedIds = new Set();
 let current = null, currentIsNew = false;
 let searchQuery = '';
 let saveTimer = null;
@@ -204,9 +206,14 @@ function weekOfSelected() {
 }
 
 function renderCalendar() {
-  monthLabel.textContent = `${viewYear}년 ${viewMonth + 1}월`;
-  calendarWrap.classList.toggle('collapsed', !calExpanded);
-  topTitleBtn.setAttribute('aria-expanded', calExpanded ? 'true' : 'false');
+  monthLabel.textContent = calMode === 'year'
+    ? `${viewYear}년` : `${viewYear}년 ${viewMonth + 1}월`;
+  calendarWrap.classList.toggle('collapsed', calMode === 'week');
+  calendarWrap.classList.toggle('year-mode', calMode === 'year');
+  topTitleBtn.setAttribute('aria-expanded', calMode === 'week' ? 'false' : 'true');
+  topTitleBtn.dataset.mode = calMode;
+
+  if (calMode === 'year') { renderYear(); return; }
 
   const countByDate = {}, reminderDates = new Set();
   for (const m of allMemos) {
@@ -217,11 +224,11 @@ function renderCalendar() {
   daysGrid.innerHTML = '';
 
   // 접힘: 선택한 날짜가 든 주 7칸만. 펼침: 기존 월간 격자.
-  const days = calExpanded
+  const days = calMode === 'month'
     ? monthDays()
     : weekOfSelected().map((d) => ({ y: d.getFullYear(), m: d.getMonth(), d: d.getDate() }));
 
-  if (calExpanded) {
+  if (calMode === 'month') {
     const firstDay = new Date(viewYear, viewMonth, 1).getDay();
     for (let i = 0; i < firstDay; i++) {
       const b = document.createElement('div'); b.className = 'day blank';
@@ -235,7 +242,7 @@ function renderCalendar() {
     const cell = document.createElement('div');
     cell.className = 'day';
     // 접힘 상태에서 이번 달이 아닌 날은 흐리게
-    if (!calExpanded && mo !== viewMonth) cell.classList.add('other-month');
+    if (calMode === 'week' && mo !== viewMonth) cell.classList.add('other-month');
     const wd = new Date(y, mo, d).getDay();
     if (wd === 0) cell.classList.add('sun');
     if (wd === 6) cell.classList.add('sat');
@@ -280,6 +287,29 @@ function selectDate(key) {
 
 // ── 목록 ──
 function memoCard(memo, showDate) {
+  const row = document.createElement('div');
+  row.className = 'memo-row';
+
+  // 지울 것을 고르는 체크칸. 카드 본문과 눌리는 곳을 분리해
+  // 실수로 메모가 열리거나 선택되는 일이 없게 한다.
+  const check = document.createElement('button');
+  check.className = 'memo-check';
+  check.type = 'button';
+  check.setAttribute('role', 'checkbox');
+  const syncCheck = () => {
+    const on = selectedIds.has(memo.id);
+    check.classList.toggle('on', on);
+    check.setAttribute('aria-checked', on ? 'true' : 'false');
+    check.textContent = on ? '✓' : '';
+    row.classList.toggle('picked', on);
+  };
+  check.addEventListener('click', (e) => {
+    e.stopPropagation();
+    selectedIds.has(memo.id) ? selectedIds.delete(memo.id) : selectedIds.add(memo.id);
+    syncCheck();
+    renderSelectBar();
+  });
+
   const card = document.createElement('div');
   card.className = 'memo-card';
   const pin = memo.pinned ? '📌 ' : '';
@@ -292,7 +322,10 @@ function memoCard(memo, showDate) {
     <div class="c-snippet">${Logic.escapeHtml(snippet)}</div>
     ${memo.tags.length ? `<div class="c-tags">${memo.tags.map((t) => `<span>#${Logic.escapeHtml(t)}</span>`).join('')}</div>` : ''}`;
   card.addEventListener('click', () => openMemo(memo));
-  return card;
+  syncCheck();
+  row.appendChild(check);
+  row.appendChild(card);
+  return row;
 }
 
 function renderList() {
@@ -516,9 +549,35 @@ function moveWeek(step) {
   selectDate(dateKey(base.getFullYear(), base.getMonth(), base.getDate()));
 }
 
+/** 주간 → 월간 → 연간 → 주간 순으로 돈다 */
 function toggleCalendar() {
-  calExpanded = !calExpanded;
+  calMode = calMode === 'week' ? 'month' : calMode === 'month' ? 'year' : 'week';
   renderCalendar();
+}
+
+/** 연간 달력 — 12개월을 한눈에. 메모가 있는 달은 진하게 표시한다. */
+function renderYear() {
+  const countByMonth = new Array(12).fill(0);
+  for (const m of allMemos) {
+    const [y, mo] = m.date.split('-').map(Number);
+    if (y === viewYear) countByMonth[mo - 1]++;
+  }
+  const t = todayObj();
+  daysGrid.innerHTML = '';
+  for (let mo = 0; mo < 12; mo++) {
+    const cell = document.createElement('button');
+    cell.className = 'year-cell';
+    if (viewYear === t.y && mo === t.m) cell.classList.add('today');
+    if (mo === viewMonth) cell.classList.add('selected');
+    cell.innerHTML = `<span class="ym">${mo + 1}월</span>` +
+      (countByMonth[mo] ? `<span class="yc">${countByMonth[mo]}</span>` : '<span class="yc dim">·</span>');
+    cell.addEventListener('click', () => {
+      viewMonth = mo;
+      calMode = 'month';       // 달을 고르면 월간으로 내려간다
+      renderCalendar();
+    });
+    daysGrid.appendChild(cell);
+  }
 }
 function goToday() {
   const t = todayObj();
@@ -531,8 +590,12 @@ $('loginBtn').addEventListener('click', doLogin);
 $('signupBtn').addEventListener('click', doSignup);
 loginPw.addEventListener('keydown', (e) => { if (e.key === 'Enter') doLogin(); });
 
-$('prevMonth').addEventListener('click', () => moveMonth(-1));
-$('nextMonth').addEventListener('click', () => moveMonth(1));
+function stepHead(step) {
+  if (calMode === 'year') { viewYear += step; renderCalendar(); }
+  else moveMonth(step);
+}
+$('prevMonth').addEventListener('click', () => stepHead(-1));
+$('nextMonth').addEventListener('click', () => stepHead(1));
 $('todayBtn').addEventListener('click', goToday);
 $('newMemoBtn').addEventListener('click', newMemo);
 topTitleBtn.addEventListener('click', toggleCalendar);
@@ -575,6 +638,46 @@ quickInput.addEventListener('keydown', (e) => {
 });
 quickSave.addEventListener('click', quickCommit);
 
+// ── 선택 삭제 ──
+const selectBar = $('selectBar'), selectCount = $('selectCount');
+
+function renderSelectBar() {
+  const n = selectedIds.size;
+  selectBar.classList.toggle('hidden', n === 0);
+  selectCount.textContent = `${n}개 선택`;
+  // 선택 중에는 새 메모 버튼을 숨긴다. 두 버튼이 겹쳐 잘못 눌리는 것을 막는다.
+  $('newMemoBtn').style.display = n > 0 ? 'none' : '';
+}
+
+function clearSelection() {
+  selectedIds.clear();
+  renderSelectBar();
+  renderList();
+}
+
+$('selectCancel').addEventListener('click', clearSelection);
+
+$('selectDelete').addEventListener('click', async () => {
+  const ids = [...selectedIds];
+  if (ids.length === 0) return;
+  if (!confirm(`메모 ${ids.length}개를 지울까요? 되돌릴 수 없습니다.`)) return;
+
+  const targets = allMemos.filter((m) => ids.includes(m.id));
+  syncStatus.textContent = '삭제 중…';
+  let failed = 0;
+  for (const m of targets) {
+    const ok = await deleteMemo(m);
+    if (!ok) failed++;
+  }
+  selectedIds.clear();
+  renderSelectBar();
+  renderCalendar(); renderList();
+  // 일부만 지워졌으면 조용히 넘어가지 않는다
+  syncStatus.textContent = failed
+    ? `⚠️ ${targets.length - failed}개 삭제, ${failed}개 실패`
+    : `${targets.length}개 삭제됨 ✓`;
+});
+
 // 상단바 높이를 재서 작성칸이 그 아래에 정확히 붙게 한다.
 function syncHeadHeight() {
   const h = document.querySelector('#mainView .top-bar')?.getBoundingClientRect().height;
@@ -604,7 +707,9 @@ calendarWrap.addEventListener('touchend', (e) => {
   swipeX = swipeY = null;
   if (Math.abs(dx) < 50 || Math.abs(dx) < Math.abs(dy)) return;  // 세로 스크롤과 헷갈리지 않게
   const step = dx < 0 ? 1 : -1;
-  calExpanded ? moveMonth(step) : moveWeek(step);
+  if (calMode === 'year') { viewYear += step; renderCalendar(); }
+  else if (calMode === 'month') moveMonth(step);
+  else moveWeek(step);
 }, { passive: true });
 
 $('searchBtn').addEventListener('click', () => {

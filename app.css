@@ -331,25 +331,43 @@ body {
 .sync-status { font-size: 12px; color: var(--text-soft); }
 
 .memo-list { padding: 0 12px; display: flex; flex-direction: column; gap: 8px; }
-/* 체크칸 + 카드 한 줄 */
-.memo-row { display: flex; align-items: stretch; gap: 8px; }
-.memo-row .memo-card { flex: 1; min-width: 0; }
+/* 체크칸 — 카드 안 제목 앞에 작게.
+   보이는 네모는 16px, 손가락이 닿는 범위는 32px 이다. */
 .memo-check {
   flex: 0 0 auto;
-  align-self: center;
-  width: 30px; height: 30px;
-  border: 2px solid var(--border);
-  border-radius: 9px;
+  position: relative;
+  border: 0;
+  background: none;
+  padding: 8px;               /* 손가락이 닿는 범위 (32px) */
+  margin: -8px 5px -8px -6px; /* 늘린 만큼 되돌려 줄 높이는 그대로 */
+  line-height: 0;
+  cursor: pointer;
+}
+/* 눈에 보이는 네모는 16px 뿐이다. 테두리를 버튼이 아닌 안쪽 상자에 그린다 */
+.memo-check::before {
+  content: '';
+  display: block;
+  box-sizing: border-box;
+  width: 16px; height: 16px;
+  border: 1.5px solid #c3c8da;
+  border-radius: 5px;
   background: var(--card);
+}
+.memo-check.on::before { background: var(--primary); border-color: var(--primary); }
+.memo-check.on::after {
+  content: '✓';
+  position: absolute;
+  left: 8px; top: 8px;
+  width: 16px; height: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   color: #fff;
-  font-size: 17px;
+  font-size: 12px;
   font-weight: 800;
   line-height: 1;
-  cursor: pointer;
-  padding: 0;
 }
-.memo-check.on { background: var(--primary); border-color: var(--primary); }
-.memo-row.picked .memo-card { border-color: var(--primary); }
+.memo-card.picked { border-color: var(--primary); background: var(--primary-soft); }
 
 /* 선택 삭제 막대 */
 .select-bar {
@@ -387,7 +405,14 @@ body {
 }
 .memo-card:active { background: var(--primary-soft); }
 .memo-card .c-date { font-size: 11px; color: var(--primary); font-weight: 700; }
-.memo-card .c-title { font-size: 15px; font-weight: 700; margin-bottom: 2px; }
+.memo-card .c-title {
+  display: flex;
+  align-items: center;
+  font-size: 15px; font-weight: 700; margin-bottom: 2px;
+  min-width: 0;
+}
+/* 제목이 길면 줄임표. 체크칸은 줄어들지 않는다 */
+.memo-card .c-title > :not(.memo-check) { min-width: 0; }
 .memo-card .c-snippet {
   font-size: 13px; color: var(--text-soft);
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;

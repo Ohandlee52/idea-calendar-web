@@ -19,7 +19,7 @@ function readConfig() {
   return null;
 }
 // 앱 버전 (배포할 때마다 올립니다 — 폰이 새 코드를 받았는지 확인용)
-const APP_VERSION = '1.5.0';
+const APP_VERSION = '1.5.1';
 
 const conf = readConfig();
 const configured = !!conf;
@@ -287,29 +287,6 @@ function selectDate(key) {
 
 // ── 목록 ──
 function memoCard(memo, showDate) {
-  const row = document.createElement('div');
-  row.className = 'memo-row';
-
-  // 지울 것을 고르는 체크칸. 카드 본문과 눌리는 곳을 분리해
-  // 실수로 메모가 열리거나 선택되는 일이 없게 한다.
-  const check = document.createElement('button');
-  check.className = 'memo-check';
-  check.type = 'button';
-  check.setAttribute('role', 'checkbox');
-  const syncCheck = () => {
-    const on = selectedIds.has(memo.id);
-    check.classList.toggle('on', on);
-    check.setAttribute('aria-checked', on ? 'true' : 'false');
-    check.textContent = on ? '✓' : '';
-    row.classList.toggle('picked', on);
-  };
-  check.addEventListener('click', (e) => {
-    e.stopPropagation();
-    selectedIds.has(memo.id) ? selectedIds.delete(memo.id) : selectedIds.add(memo.id);
-    syncCheck();
-    renderSelectBar();
-  });
-
   const card = document.createElement('div');
   card.className = 'memo-card';
   const pin = memo.pinned ? '📌 ' : '';
@@ -321,11 +298,32 @@ function memoCard(memo, showDate) {
     <div class="c-title">${pin}${Logic.escapeHtml(title)}${bell}</div>
     <div class="c-snippet">${Logic.escapeHtml(snippet)}</div>
     ${memo.tags.length ? `<div class="c-tags">${memo.tags.map((t) => `<span>#${Logic.escapeHtml(t)}</span>`).join('')}</div>` : ''}`;
+
+  // 체크칸은 카드 안 제목 앞에 작게 둔다.
+  // 카드 밖에 두면 왼쪽에 기둥이 생겨 목록이 어수선해지고 카드도 좁아진다.
+  // 보이는 크기는 작게 두되 손가락이 닿는 범위는 padding 으로 넓힌다.
+  const check = document.createElement('button');
+  check.className = 'memo-check';
+  check.type = 'button';
+  check.setAttribute('role', 'checkbox');
+  const syncCheck = () => {
+    const on = selectedIds.has(memo.id);
+    check.classList.toggle('on', on);
+    check.setAttribute('aria-checked', on ? 'true' : 'false');
+    check.setAttribute('aria-label', on ? '선택 해제' : '선택');
+    card.classList.toggle('picked', on);
+  };
+  check.addEventListener('click', (e) => {
+    e.stopPropagation();       // 체크는 선택만. 메모를 열지 않는다
+    selectedIds.has(memo.id) ? selectedIds.delete(memo.id) : selectedIds.add(memo.id);
+    syncCheck();
+    renderSelectBar();
+  });
+  card.querySelector('.c-title').prepend(check);
+
   card.addEventListener('click', () => openMemo(memo));
   syncCheck();
-  row.appendChild(check);
-  row.appendChild(card);
-  return row;
+  return card;
 }
 
 function renderList() {

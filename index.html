@@ -40,8 +40,27 @@
 
       <button id="loginBtn" class="primary-btn big">로그인</button>
       <button id="signupBtn" class="ghost-btn">처음이신가요? 계정 만들기</button>
+      <button id="forgotBtn" class="link-btn">비밀번호를 잊으셨나요?</button>
 
       <p id="loginMsg" class="login-msg"></p>
+    </div>
+  </section>
+
+  <!-- ───── 새 비밀번호 설정 (메일의 재설정 링크를 눌렀을 때만 뜸) ───── -->
+  <section id="resetView" class="login-view hidden">
+    <div class="login-box">
+      <div class="login-logo">🔑</div>
+      <h1>새 비밀번호 설정</h1>
+      <p class="login-sub">새로 쓸 비밀번호를 입력해 주세요</p>
+
+      <input id="resetPw" type="password" autocomplete="new-password"
+             placeholder="새 비밀번호 (6자 이상)" />
+      <input id="resetPw2" type="password" autocomplete="new-password"
+             placeholder="새 비밀번호 확인" />
+
+      <button id="resetSaveBtn" class="primary-btn big">바꾸고 시작하기</button>
+
+      <p id="resetMsg" class="login-msg"></p>
     </div>
   </section>
 

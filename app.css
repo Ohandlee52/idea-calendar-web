@@ -92,6 +92,18 @@ body {
   cursor: pointer;
   text-decoration: underline;
 }
+/* "계정 만들기"보다 눈에 덜 띄어야 한다. 비밀번호 찾기는 자주 쓰는 동작이 아니다 */
+.link-btn {
+  width: 100%;
+  border: none;
+  background: transparent;
+  color: var(--primary);
+  font-size: 12.5px;
+  padding: 6px;
+  margin-top: 2px;
+  cursor: pointer;
+  text-decoration: underline;
+}
 
 /* ── 상단 바 ── */
 .main-view, .edit-view { min-height: 100vh; padding-bottom: calc(80px + var(--safe-bottom)); }

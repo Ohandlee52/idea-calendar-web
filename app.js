@@ -19,7 +19,7 @@ function readConfig() {
   return null;
 }
 // 앱 버전 (배포할 때마다 올립니다 — 폰이 새 코드를 받았는지 확인용)
-const APP_VERSION = '1.6.2';
+const APP_VERSION = '1.6.3';
 
 const conf = readConfig();
 const configured = !!conf;
@@ -29,6 +29,7 @@ const sb = configured ? window.supabase.createClient(conf.url, conf.key) : null;
 const $ = (id) => document.getElementById(id);
 const loginView = $('loginView'), mainView = $('mainView'), editView = $('editView');
 const loginEmail = $('loginEmail'), loginPw = $('loginPw'), loginMsg = $('loginMsg');
+const resetView = $('resetView'), resetPw = $('resetPw'), resetPw2 = $('resetPw2'), resetMsg = $('resetMsg');
 const monthLabel = $('monthLabel'), daysGrid = $('daysGrid');
 const calendarWrap = $('calendarWrap'), topTitleBtn = $('topTitle'), topTitleText = $('topTitleText');
 const listTitle = $('listTitle'), memoList = $('memoList'), syncStatus = $('syncStatus');
@@ -103,14 +104,58 @@ async function doSignup() {
   else showLoginMsg('가입 확인 메일을 보냈어요. 메일의 링크를 누른 뒤 로그인해 주세요.', 'ok');
 }
 
+// ── 비밀번호 찾기 ──
+// 이메일 칸에 주소를 넣고 누르면 그 메일로 재설정 링크를 보낸다.
+// 그 링크를 누르면 이 앱으로 돌아오면서 아래 onAuthStateChange 가 감지해
+// resetView 를 띄운다.
+async function doForgotPassword() {
+  if (!sb) { showLoginMsg('연결 설정(config.js)이 아직 안 됐어요.', 'error'); return; }
+  const email = loginEmail.value.trim();
+  if (!email) { showLoginMsg('이메일 칸에 주소를 먼저 입력해 주세요.', 'error'); return; }
+  showLoginMsg('재설정 메일 보내는 중…');
+  const redirectTo = location.origin + location.pathname;
+  const { error } = await sb.auth.resetPasswordForEmail(email, { redirectTo });
+  if (error) { showLoginMsg(translateAuthError(error.message), 'error'); return; }
+  showLoginMsg('재설정 링크를 메일로 보냈어요. 메일함을 확인해 주세요.', 'ok');
+}
+
+function showResetMsg(text, kind) {
+  resetMsg.textContent = text;
+  resetMsg.className = 'login-msg' + (kind ? ' ' + kind : '');
+}
+
+function showResetView() {
+  loginView.classList.add('hidden');
+  mainView.classList.add('hidden');
+  resetView.classList.remove('hidden');
+}
+
+// 새 비밀번호를 저장한다. 메일 링크를 눌러 온 상태라 이미 임시로 로그인돼
+// 있으므로, 성공하면 설정 화면 없이 바로 앱으로 들어간다.
+async function doResetPassword() {
+  const pw = resetPw.value, pw2 = resetPw2.value;
+  if (pw.length < 6) { showResetMsg('비밀번호는 6자 이상이어야 해요.', 'error'); return; }
+  if (pw !== pw2) { showResetMsg('두 비밀번호가 서로 달라요.', 'error'); return; }
+  showResetMsg('저장 중…');
+  const { data, error } = await sb.auth.updateUser({ password: pw });
+  if (error) { showResetMsg(translateAuthError(error.message), 'error'); return; }
+  resetView.classList.add('hidden');
+  user = data.user;
+  await enterApp();
+}
+
 // 영어 오류 메시지를 알기 쉬운 한국어로
 function translateAuthError(msg) {
   const m = String(msg).toLowerCase();
   if (m.includes('invalid login')) return '이메일 또는 비밀번호가 맞지 않아요.';
   if (m.includes('already registered')) return '이미 가입된 이메일이에요. 로그인해 주세요.';
   if (m.includes('email not confirmed')) return '메일함에서 가입 확인 링크를 먼저 눌러주세요.';
+  if (m.includes('same password') || m.includes('different from the old'))
+    return '이전과 다른 비밀번호를 입력해 주세요.';
   if (m.includes('password')) return '비밀번호는 6자 이상이어야 해요.';
   if (m.includes('failed to fetch')) return '인터넷 연결을 확인해 주세요.';
+  if (m.includes('rate limit') || m.includes('security purposes'))
+    return '너무 자주 요청했어요. 잠시 뒤 다시 시도해 주세요.';
   return `문제가 생겼어요: ${msg}`;
 }
 
@@ -661,6 +706,8 @@ function goToday() {
 // ── 이벤트 연결 ──
 $('loginBtn').addEventListener('click', doLogin);
 $('signupBtn').addEventListener('click', doSignup);
+$('forgotBtn').addEventListener('click', doForgotPassword);
+$('resetSaveBtn').addEventListener('click', doResetPassword);
 loginPw.addEventListener('keydown', (e) => { if (e.key === 'Enter') doLogin(); });
 
 function stepHead(step) {
@@ -1075,6 +1122,12 @@ $('menuSetup').addEventListener('click', () => { sheet.classList.add('hidden'); 
   }
 
   if (!configured) { openSetup(); return; }   // 아직 연결 정보가 없으면 설정부터
+
+  // 비밀번호 재설정 메일의 링크를 눌러 돌아온 경우를 감지한다.
+  // 이 이벤트가 오면 로그인 화면 대신 새 비밀번호 설정 화면을 보여준다.
+  sb.auth.onAuthStateChange((event) => {
+    if (event === 'PASSWORD_RECOVERY') showResetView();
+  });
 
   $('loginView').classList.remove('hidden');
   const { data } = await sb.auth.getSession();

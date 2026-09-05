@@ -19,7 +19,7 @@ function readConfig() {
   return null;
 }
 // 앱 버전 (배포할 때마다 올립니다 — 폰이 새 코드를 받았는지 확인용)
-const APP_VERSION = '1.3.0';
+const APP_VERSION = '1.4.0';
 
 const conf = readConfig();
 const configured = !!conf;
@@ -535,8 +535,62 @@ $('prevMonth').addEventListener('click', () => moveMonth(-1));
 $('nextMonth').addEventListener('click', () => moveMonth(1));
 $('todayBtn').addEventListener('click', goToday);
 $('newMemoBtn').addEventListener('click', newMemo);
-$('quickAdd').addEventListener('click', newMemo);
 topTitleBtn.addEventListener('click', toggleCalendar);
+
+// ── 바로 쓰기 ──
+// 아이디어 메모장의 핵심 동선이다. 한 번 눌러 타이핑, 엔터로 저장. 화면 이동이 없다.
+const quickInput = $('quickInput'), quickSave = $('quickSave');
+
+function refreshQuickSave() {
+  quickSave.classList.toggle('hidden', quickInput.value.trim() === '');
+}
+
+async function quickCommit() {
+  const text = quickInput.value.trim();
+  if (!text || !selectedKey) return;
+  // 첫 줄을 제목으로 쓴다. 제목만 있는 메모가 아이디어 메모의 기본 형태다.
+  const memo = {
+    id: crypto.randomUUID(), date: selectedKey,
+    title: text, body: '', bodyHtml: '', tags: [],
+    pinned: false, reminders: [],
+    createdAt: nowISO(), updatedAt: nowISO(),
+  };
+  quickInput.value = '';
+  refreshQuickSave();
+  allMemos = [memo, ...allMemos];
+  renderCalendar(); renderList();
+  const ok = await saveMemo(memo);
+  if (!ok) {
+    // 저장에 실패하면 조용히 넘기지 않는다. 되돌리고 입력값을 살려 준다.
+    allMemos = Logic.removeById(allMemos, memo.id);
+    renderCalendar(); renderList();
+    quickInput.value = text;
+    refreshQuickSave();
+  }
+}
+
+quickInput.addEventListener('input', refreshQuickSave);
+quickInput.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') { e.preventDefault(); quickCommit(); }
+});
+quickSave.addEventListener('click', quickCommit);
+
+// 상단바 높이를 재서 작성칸이 그 아래에 정확히 붙게 한다.
+function syncHeadHeight() {
+  const h = document.querySelector('#mainView .top-bar')?.getBoundingClientRect().height;
+  if (h) document.documentElement.style.setProperty('--head-h', Math.round(h) + 'px');
+}
+window.addEventListener('resize', syncHeadHeight);
+window.addEventListener('orientationchange', syncHeadHeight);
+syncHeadHeight();
+
+// 쓰다가 길어지면 전체 편집 화면으로 넘긴다. 친 내용은 그대로 가져간다.
+$('quickExpand').addEventListener('click', () => {
+  const text = quickInput.value.trim();
+  quickInput.value = ''; refreshQuickSave();
+  newMemo();
+  if (text) { titleInput.value = text; }
+});
 
 // 달력을 좌우로 밀어 이동한다. 접힘이면 주 단위, 펼침이면 달 단위.
 let swipeX = null, swipeY = null;

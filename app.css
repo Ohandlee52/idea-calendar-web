@@ -124,24 +124,51 @@ body {
 .top-title-btn .caret { font-size: 11px; color: var(--text-soft); transition: transform .15s; }
 .top-title-btn[aria-expanded="true"] .caret { transform: rotate(180deg); }
 
-/* 바로 쓰기 줄 — 목록 맨 위에서 한 번만 눌러 메모를 시작한다 */
+/* 바로 쓰기 줄 — 달력 바로 아래에 붙어 스크롤해도 사라지지 않는다.
+   아이디어 메모장이므로 "떠오르면 바로 친다"가 가장 짧은 길이어야 한다. */
 .quick-add {
+  position: sticky;
+  /* 상단바가 sticky top:0 이라 그 아래에 붙어야 가려지지 않는다.
+     상단바 실제 높이는 안전영역에 따라 달라지므로 JS 가 --head-h 로 넣어 준다. */
+  top: var(--head-h, 56px);
+  z-index: 15;
   display: flex;
   align-items: center;
-  gap: 8px;
-  width: calc(100% - 24px);
-  margin: 10px 12px 2px;
-  padding: 11px 14px;
-  border: 1px solid var(--border);
+  gap: 6px;
+  padding: 8px 12px;
+  background: var(--bg);
+  border-bottom: 1px solid var(--border);
+}
+.qa-input {
+  flex: 1;
+  min-width: 0;
+  border: 1.5px solid var(--primary);
   border-radius: 12px;
+  padding: 11px 14px;
+  font-size: 16px;
+  font-family: inherit;
+  color: var(--text);
   background: var(--card);
-  color: var(--text-soft);
+  outline: none;
+}
+.qa-input::placeholder { color: var(--text-soft); }
+.qa-save, .qa-expand {
+  flex: 0 0 auto;
+  border: 1px solid var(--border);
+  background: var(--card);
+  border-radius: 12px;
+  min-width: 44px; min-height: 44px;
   font-size: 15px;
-  text-align: left;
+  color: var(--text);
   cursor: pointer;
 }
-.quick-add:active { background: var(--primary-soft); }
-.qa-plus { font-size: 17px; color: var(--primary); font-weight: 800; }
+.qa-save {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: #fff;
+  font-weight: 800;
+  padding: 0 14px;
+}
 .list-sub { font-size: 13px; font-weight: 700; color: var(--text-soft); }
 
 .top-title {
@@ -297,7 +324,9 @@ body {
   font-size: 13px; color: var(--text-soft);
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
-.memo-card .c-tags { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
+/* 태그는 목록에서 숨긴다. 자리를 많이 먹는데 훑어볼 때 도움이 적다.
+   편집화면과 검색에서는 그대로 쓴다. */
+.memo-card .c-tags { display: none; }
 .memo-card .c-tags span {
   font-size: 11px; color: var(--primary); background: var(--primary-soft);
   border-radius: 999px; padding: 2px 8px;
@@ -310,19 +339,26 @@ body {
 /* ── 새 메모 버튼 (오른쪽 아래 동그란 버튼) ── */
 .fab {
   position: fixed;
-  right: 18px;
-  bottom: calc(18px + var(--safe-bottom));
-  width: 58px; height: 58px;
-  border-radius: 50%;
+  right: 16px;
+  /* 하단 시스템 바(제미나이 바 등)에 가리지 않게 충분히 띄운다 */
+  bottom: calc(84px + var(--safe-bottom));
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 56px;
+  padding: 0 22px 0 18px;
+  border-radius: 999px;
   border: none;
   background: var(--primary);
   color: #fff;
-  font-size: 30px;
+  font-size: 17px;
+  font-weight: 800;
   line-height: 1;
   cursor: pointer;
-  box-shadow: 0 4px 14px rgba(91, 110, 245, .4);
+  box-shadow: 0 6px 18px rgba(91, 110, 245, .45);
   z-index: 30;
 }
+.fab .fab-plus { font-size: 26px; font-weight: 400; }
 .fab:active { filter: brightness(.94); }
 
 /* ── 편집 화면 ── */

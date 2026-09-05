@@ -81,10 +81,14 @@
       <div id="daysGrid" class="days-grid"></div>
     </div>
 
-    <!-- 바로 쓰기 -->
-    <button id="quickAdd" class="quick-add">
-      <span class="qa-plus">＋</span><span class="qa-text">무엇이 떠올랐나요?</span>
-    </button>
+    <!-- 바로 쓰기 — 스크롤해도 늘 붙어 있고, 한 번 눌러 바로 타이핑한다 -->
+    <div class="quick-add">
+      <input id="quickInput" class="qa-input" type="text"
+             placeholder="무엇이 떠올랐나요?" enterkeyhint="done"
+             autocomplete="off" autocapitalize="sentences" />
+      <button id="quickSave" class="qa-save hidden" title="저장">저장</button>
+      <button id="quickExpand" class="qa-expand" title="자세히 쓰기">⤢</button>
+    </div>
 
     <!-- 메모 목록 -->
     <div class="list-head">
@@ -94,7 +98,7 @@
     <div id="memoList" class="memo-list"></div>
 
     <!-- 새 메모 버튼 -->
-    <button id="newMemoBtn" class="fab" title="새 메모">＋</button>
+    <button id="newMemoBtn" class="fab" title="새 메모"><span class="fab-plus">＋</span>메모</button>
   </section>
 
   <!-- ───── 메모 편집 화면 (전체 화면) ───── -->

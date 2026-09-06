@@ -97,6 +97,14 @@ https://cdn.jsdelivr.net/npm/@electric-sql/pglite/dist/index.js
 git add -A && git commit && git push origin main
 ```
 
+**판 번호를 올릴 때는 두 군데를 같이 고친다.**
+
+1. `app.js` 의 `APP_VERSION`
+2. `index.html` 의 `?v=` (app.css / config.js / logic.js / holidays.js / app.js 다섯 줄)
+
+두 번째를 빠뜨리면 폰이 저장해 둔 옛 파일을 계속 쓴다. 실제로 두 번 겪었다.
+주소가 달라지면 브라우저가 저장해 둘 옛것이 없어져 반드시 새로 받는다.
+
 GitHub Pages가 1분쯤 뒤 반영한다. `gh api repos/Ohandlee52/idea-calendar-web/pages/builds/latest`
 로 `built` 인지 확인하고, `curl` 로 실제 내용이 바뀌었는지 본다.
 

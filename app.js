@@ -19,7 +19,7 @@ function readConfig() {
   return null;
 }
 // 앱 버전 (배포할 때마다 올립니다 — 폰이 새 코드를 받았는지 확인용)
-const APP_VERSION = '1.8.1';
+const APP_VERSION = '1.8.2';
 
 const conf = readConfig();
 const configured = !!conf;

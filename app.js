@@ -19,7 +19,7 @@ function readConfig() {
   return null;
 }
 // 앱 버전 (배포할 때마다 올립니다 — 폰이 새 코드를 받았는지 확인용)
-const APP_VERSION = '1.8.0';
+const APP_VERSION = '1.8.1';
 
 const conf = readConfig();
 const configured = !!conf;
@@ -83,12 +83,24 @@ function showLoginMsg(text, kind) {
 // 아래 init 의 getSession() 이 그걸 집어서 앱으로 들여보낸다.
 const OAUTH_NAME = { google: '구글', kakao: '카카오' };
 
+// 카카오는 이메일을 받으려면 사업자 등록(비즈 앱)이 필요하다. 그래서 이메일은
+// 안 받고 닉네임·프로필사진만 받는다. 그런데 무엇을 받을지 안 적어주면
+// 이메일까지 달라고 해서 카카오가 KOE205("설정하지 않은 동의항목") 로 막는다.
+// 그래서 받을 항목을 여기서 못박는다.
+const OAUTH_SCOPES = { kakao: 'profile_nickname profile_image' };
+
+function oauthOptions(provider) {
+  const opts = { redirectTo: location.origin + location.pathname };
+  if (OAUTH_SCOPES[provider]) opts.scopes = OAUTH_SCOPES[provider];
+  return opts;
+}
+
 async function doOAuthLogin(provider) {
   if (!sb) { showLoginMsg('연결 설정(config.js)이 아직 안 됐어요.', 'error'); return; }
   showLoginMsg(`${OAUTH_NAME[provider]}로 이동 중…`);
   const { error } = await sb.auth.signInWithOAuth({
     provider,
-    options: { redirectTo: location.origin + location.pathname },
+    options: oauthOptions(provider),
   });
   // 성공하면 이 줄에 닿기 전에 화면이 그쪽으로 넘어간다.
   if (error) showLoginMsg(translateAuthError(error.message), 'error');
@@ -202,7 +214,9 @@ function translateAuthError(msg) {
   if (m.includes('invalid or has expired'))
     return '링크가 만료됐어요. 처음부터 다시 시도해 주세요.';
   if (m.includes('provider is not enabled'))
-    return '구글 로그인이 아직 켜져 있지 않아요. (Supabase 설정 필요)';
+    return '이 로그인 방식이 아직 켜져 있지 않아요. (Supabase 설정 필요)';
+  if (m.includes('koe205'))
+    return '카카오에서 요청 항목이 맞지 않아요. (동의항목 설정 확인 필요)';
   if (m.includes('manual linking') || m.includes('manual_linking'))
     return '계정 연결 기능이 아직 켜져 있지 않아요. '
          + '(Supabase → Authentication → Manual Linking 켜기)';
@@ -975,7 +989,7 @@ for (const it of LINK_ITEMS) {
   $(it.id).addEventListener('click', async () => {
     const { error } = await sb.auth.linkIdentity({
       provider: it.provider,
-      options: { redirectTo: location.origin + location.pathname },
+      options: oauthOptions(it.provider),
     });
     // 성공하면 이 줄에 닿기 전에 화면이 그쪽으로 넘어간다.
     if (error) {

@@ -19,7 +19,7 @@ function readConfig() {
   return null;
 }
 // 앱 버전 (배포할 때마다 올립니다 — 폰이 새 코드를 받았는지 확인용)
-const APP_VERSION = '1.7.0';
+const APP_VERSION = '1.7.1';
 
 const conf = readConfig();
 const configured = !!conf;
@@ -201,6 +201,11 @@ function translateAuthError(msg) {
     return '링크가 만료됐어요. 처음부터 다시 시도해 주세요.';
   if (m.includes('provider is not enabled'))
     return '구글 로그인이 아직 켜져 있지 않아요. (Supabase 설정 필요)';
+  if (m.includes('manual linking') || m.includes('manual_linking'))
+    return '계정 연결 기능이 아직 켜져 있지 않아요. '
+         + '(Supabase → Authentication → Manual Linking 켜기)';
+  if (m.includes('identity is already linked') || m.includes('already linked'))
+    return '이미 연결된 구글 계정이에요.';
   if (m.includes('rate limit') || m.includes('security purposes'))
     return '너무 자주 요청했어요. 잠시 뒤 다시 시도해 주세요.';
   return `문제가 생겼어요: ${msg}`;
@@ -929,6 +934,46 @@ $('editDelete').addEventListener('click', async () => {
 $('menuBtn').addEventListener('click', () => {
   $('sheetTitle').textContent = `메뉴 · v${APP_VERSION}`;
   sheet.classList.remove('hidden');
+  refreshLinkGoogleItem();
+});
+
+// ── 구글 계정 연결 ──
+// 이미 로그인한 계정에 구글을 "덧붙이는" 것이다. 이메일이 달라도 되고,
+// 새 계정이 만들어지지 않으므로 메모가 안 보이는 사고가 생길 수 없다.
+// (Supabase 쪽에서 Manual Linking 을 켜 두어야 동작한다)
+async function refreshLinkGoogleItem() {
+  const btn = $('menuLinkGoogle');
+  btn.disabled = true;
+  btn.textContent = '🔗 구글 계정 연결 확인 중…';
+  try {
+    const { data, error } = await sb.auth.getUserIdentities();
+    if (error) throw error;
+    const linked = (data.identities || []).some((i) => i.provider === 'google');
+    if (linked) {
+      btn.textContent = '✅ 구글 계정 연결됨';
+      btn.disabled = true;      // 이미 연결됐으면 누를 일이 없다
+    } else {
+      btn.textContent = '🔗 구글 계정 연결하기';
+      btn.disabled = false;
+    }
+  } catch (e) {
+    // 확인에 실패해도 연결 자체는 시도할 수 있게 열어 둔다
+    console.error(e);
+    btn.textContent = '🔗 구글 계정 연결하기';
+    btn.disabled = false;
+  }
+}
+
+$('menuLinkGoogle').addEventListener('click', async () => {
+  const { error } = await sb.auth.linkIdentity({
+    provider: 'google',
+    options: { redirectTo: location.origin + location.pathname },
+  });
+  // 성공하면 이 줄에 닿기 전에 화면이 구글로 넘어간다.
+  if (error) {
+    sheet.classList.add('hidden');
+    alert(translateAuthError(error.message));
+  }
 });
 
 // 앱을 최신 코드로 다시 받기 (저장해둔 파일을 지우고 새로 내려받습니다)

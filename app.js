@@ -19,7 +19,7 @@ function readConfig() {
   return null;
 }
 // 앱 버전 (배포할 때마다 올립니다 — 폰이 새 코드를 받았는지 확인용)
-const APP_VERSION = '1.6.4';
+const APP_VERSION = '1.7.0';
 
 const conf = readConfig();
 const configured = !!conf;
@@ -76,6 +76,39 @@ function fmtDateTime(iso) {
 function showLoginMsg(text, kind) {
   loginMsg.textContent = text;
   loginMsg.className = 'login-msg' + (kind ? ' ' + kind : '');
+}
+
+// 구글 계정으로 로그인. 이 창을 떠나 구글로 갔다가 다시 돌아온다.
+// 돌아오면 supabase-js 가 주소에 붙어온 정보로 알아서 로그인 상태를 만들고,
+// 아래 init 의 getSession() 이 그걸 집어서 앱으로 들여보낸다.
+async function doGoogleLogin() {
+  if (!sb) { showLoginMsg('연결 설정(config.js)이 아직 안 됐어요.', 'error'); return; }
+  showLoginMsg('구글로 이동 중…');
+  const { error } = await sb.auth.signInWithOAuth({
+    provider: 'google',
+    options: { redirectTo: location.origin + location.pathname },
+  });
+  // 성공하면 이 줄에 닿기 전에 화면이 구글로 넘어간다.
+  if (error) showLoginMsg(translateAuthError(error.message), 'error');
+}
+
+// 구글에서 돌아왔는데 실패한 경우, 주소에 실패 사유가 붙어 온다.
+// 조용히 로그인 화면만 띄우면 왜 안 됐는지 알 수가 없으므로 읽어서 알려준다.
+function showOAuthErrorIfAny() {
+  const q = new URLSearchParams(location.search);
+  const h = new URLSearchParams(location.hash.replace(/^#/, ''));
+  const desc = q.get('error_description') || h.get('error_description')
+            || q.get('error') || h.get('error');
+  if (!desc) return;
+  const raw = decodeURIComponent(desc.replace(/\+/g, ' '));
+  // 구글 로그인은 초대코드를 실어 나를 수 없다. 그래서 아직 가입 안 된 구글
+  // 계정으로 들어오면 초대코드 검사에 걸려 이 오류가 난다. 원인을 정확히 알린다.
+  const msg = raw.toLowerCase().includes('database error')
+    ? '아직 가입되지 않은 구글 계정이에요. 먼저 초대코드로 가입한 뒤에 구글 로그인을 쓸 수 있어요.'
+    : translateAuthError(raw);
+  showLoginMsg(msg, 'error');
+  // 주소를 깨끗이 정리해 새로고침해도 오류가 다시 뜨지 않게 한다
+  history.replaceState(null, '', location.origin + location.pathname);
 }
 
 async function doLogin() {
@@ -164,6 +197,10 @@ function translateAuthError(msg) {
     return '초대코드가 올바르지 않거나 이미 사용됐어요. 코드를 다시 확인해 주세요.';
   if (m.includes('password')) return '비밀번호는 6자 이상이어야 해요.';
   if (m.includes('failed to fetch')) return '인터넷 연결을 확인해 주세요.';
+  if (m.includes('invalid or has expired'))
+    return '링크가 만료됐어요. 처음부터 다시 시도해 주세요.';
+  if (m.includes('provider is not enabled'))
+    return '구글 로그인이 아직 켜져 있지 않아요. (Supabase 설정 필요)';
   if (m.includes('rate limit') || m.includes('security purposes'))
     return '너무 자주 요청했어요. 잠시 뒤 다시 시도해 주세요.';
   return `문제가 생겼어요: ${msg}`;
@@ -716,6 +753,7 @@ function goToday() {
 // ── 이벤트 연결 ──
 $('loginBtn').addEventListener('click', doLogin);
 $('signupBtn').addEventListener('click', doSignup);
+$('googleBtn').addEventListener('click', doGoogleLogin);
 $('forgotBtn').addEventListener('click', doForgotPassword);
 $('resetSaveBtn').addEventListener('click', doResetPassword);
 loginPw.addEventListener('keydown', (e) => { if (e.key === 'Enter') doLogin(); });
@@ -1141,5 +1179,8 @@ $('menuSetup').addEventListener('click', () => { sheet.classList.add('hidden'); 
 
   $('loginView').classList.remove('hidden');
   const { data } = await sb.auth.getSession();
-  if (data.session) { user = data.session.user; await enterApp(); }
+  if (data.session) { user = data.session.user; await enterApp(); return; }
+
+  // 로그인이 안 된 채로 왔다면, 구글에서 실패해서 돌아온 것일 수 있다.
+  showOAuthErrorIfAny();
 })();

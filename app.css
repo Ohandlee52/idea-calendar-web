@@ -80,6 +80,42 @@ body {
   cursor: pointer;
 }
 .primary-btn.big { width: 100%; padding: 14px; font-size: 16px; margin-top: 4px; }
+
+/* 구글 로그인 단추 — 구글 규정대로 흰 바탕에 로고와 글자를 함께 둔다 */
+.oauth-btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 13px;
+  margin-bottom: 6px;
+  border: 1.5px solid var(--border);
+  border-radius: 12px;
+  background: var(--card);
+  color: var(--text);
+  font-family: inherit;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.oauth-btn:disabled { opacity: .5; }
+
+/* "또는 이메일로" — 양옆으로 선이 그어진 구분선 */
+.or-line {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 14px 0 10px;
+  color: var(--text-soft);
+  font-size: 12.5px;
+}
+.or-line::before, .or-line::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+}
 .primary-btn:disabled { opacity: .5; }
 .ghost-btn {
   width: 100%;

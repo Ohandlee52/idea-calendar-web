@@ -19,7 +19,7 @@ function readConfig() {
   return null;
 }
 // 앱 버전 (배포할 때마다 올립니다 — 폰이 새 코드를 받았는지 확인용)
-const APP_VERSION = '1.9.0';
+const APP_VERSION = '1.9.1';
 
 const conf = readConfig();
 const configured = !!conf;
@@ -945,6 +945,7 @@ $('editDelete').addEventListener('click', async () => {
 $('menuBtn').addEventListener('click', () => {
   $('sheetTitle').textContent = `메뉴 · v${APP_VERSION}`;
   sheet.classList.remove('hidden');
+  $('menuImport').hidden = !user || user.id !== OWNER_ID;
   refreshLinkItems();
 });
 
@@ -952,6 +953,11 @@ $('menuBtn').addEventListener('click', () => {
 // 이미 로그인한 계정에 "덧붙이는" 것이다. 이메일이 달라도 되고,
 // 새 계정이 만들어지지 않으므로 메모가 안 보이는 사고가 생길 수 없다.
 // (Supabase 쪽에서 Manual Linking 을 켜 두어야 동작한다)
+// "PC 메모 가져오기" 는 만든 사람만 쓰는 기능이다. 다른 분들은 PC 앱도
+// 없고 그 폴더도 없어서 눌러도 소용이 없고 혼란만 준다.
+// 이름·이메일이 아니라 뜻 없는 식별 번호라 공개 저장소에 두어도 무방하다.
+const OWNER_ID = '9854fb66-e4e2-4a20-9796-e7d6ce1776ee';
+
 const LINK_ITEMS = [
   { id: 'menuLinkGoogle', provider: 'google', label: '구글' },
   { id: 'menuLinkKakao',  provider: 'kakao',  label: '카카오' },
@@ -1215,7 +1221,6 @@ $('setupSave').addEventListener('click', () => {
   localStorage.setItem('sbKey', key);
   location.reload();   // 새 정보로 다시 시작
 });
-$('menuSetup').addEventListener('click', () => { sheet.classList.add('hidden'); openSetup(); });
 
 // ── 시작 ──
 (async function init() {

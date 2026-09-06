@@ -19,7 +19,7 @@ function readConfig() {
   return null;
 }
 // 앱 버전 (배포할 때마다 올립니다 — 폰이 새 코드를 받았는지 확인용)
-const APP_VERSION = '1.7.1';
+const APP_VERSION = '1.8.0';
 
 const conf = readConfig();
 const configured = !!conf;
@@ -78,17 +78,19 @@ function showLoginMsg(text, kind) {
   loginMsg.className = 'login-msg' + (kind ? ' ' + kind : '');
 }
 
-// 구글 계정으로 로그인. 이 창을 떠나 구글로 갔다가 다시 돌아온다.
+// 바깥 계정(구글·카카오)으로 로그인. 이 창을 떠나 그쪽으로 갔다가 다시 돌아온다.
 // 돌아오면 supabase-js 가 주소에 붙어온 정보로 알아서 로그인 상태를 만들고,
 // 아래 init 의 getSession() 이 그걸 집어서 앱으로 들여보낸다.
-async function doGoogleLogin() {
+const OAUTH_NAME = { google: '구글', kakao: '카카오' };
+
+async function doOAuthLogin(provider) {
   if (!sb) { showLoginMsg('연결 설정(config.js)이 아직 안 됐어요.', 'error'); return; }
-  showLoginMsg('구글로 이동 중…');
+  showLoginMsg(`${OAUTH_NAME[provider]}로 이동 중…`);
   const { error } = await sb.auth.signInWithOAuth({
-    provider: 'google',
+    provider,
     options: { redirectTo: location.origin + location.pathname },
   });
-  // 성공하면 이 줄에 닿기 전에 화면이 구글로 넘어간다.
+  // 성공하면 이 줄에 닿기 전에 화면이 그쪽으로 넘어간다.
   if (error) showLoginMsg(translateAuthError(error.message), 'error');
 }
 
@@ -101,10 +103,10 @@ function showOAuthErrorIfAny() {
             || q.get('error') || h.get('error');
   if (!desc) return;
   const raw = decodeURIComponent(desc.replace(/\+/g, ' '));
-  // 구글 로그인은 초대코드를 실어 나를 수 없다. 그래서 아직 가입 안 된 구글
+  // 구글·카카오 로그인은 초대코드를 실어 나를 수 없다. 그래서 아직 가입 안 된
   // 계정으로 들어오면 초대코드 검사에 걸려 이 오류가 난다. 원인을 정확히 알린다.
   const msg = raw.toLowerCase().includes('database error')
-    ? '아직 가입되지 않은 구글 계정이에요. 먼저 초대코드로 가입한 뒤에 구글 로그인을 쓸 수 있어요.'
+    ? '아직 가입되지 않은 계정이에요. 먼저 초대코드로 가입한 뒤에 구글·카카오 로그인을 쓸 수 있어요.'
     : translateAuthError(raw);
   showLoginMsg(msg, 'error');
   // 주소를 깨끗이 정리해 새로고침해도 오류가 다시 뜨지 않게 한다
@@ -758,7 +760,8 @@ function goToday() {
 // ── 이벤트 연결 ──
 $('loginBtn').addEventListener('click', doLogin);
 $('signupBtn').addEventListener('click', doSignup);
-$('googleBtn').addEventListener('click', doGoogleLogin);
+$('googleBtn').addEventListener('click', () => doOAuthLogin('google'));
+$('kakaoBtn').addEventListener('click', () => doOAuthLogin('kakao'));
 $('forgotBtn').addEventListener('click', doForgotPassword);
 $('resetSaveBtn').addEventListener('click', doResetPassword);
 loginPw.addEventListener('keydown', (e) => { if (e.key === 'Enter') doLogin(); });
@@ -934,47 +937,53 @@ $('editDelete').addEventListener('click', async () => {
 $('menuBtn').addEventListener('click', () => {
   $('sheetTitle').textContent = `메뉴 · v${APP_VERSION}`;
   sheet.classList.remove('hidden');
-  refreshLinkGoogleItem();
+  refreshLinkItems();
 });
 
-// ── 구글 계정 연결 ──
-// 이미 로그인한 계정에 구글을 "덧붙이는" 것이다. 이메일이 달라도 되고,
+// ── 바깥 계정 연결 (구글·카카오) ──
+// 이미 로그인한 계정에 "덧붙이는" 것이다. 이메일이 달라도 되고,
 // 새 계정이 만들어지지 않으므로 메모가 안 보이는 사고가 생길 수 없다.
 // (Supabase 쪽에서 Manual Linking 을 켜 두어야 동작한다)
-async function refreshLinkGoogleItem() {
-  const btn = $('menuLinkGoogle');
-  btn.disabled = true;
-  btn.textContent = '🔗 구글 계정 연결 확인 중…';
+const LINK_ITEMS = [
+  { id: 'menuLinkGoogle', provider: 'google', label: '구글' },
+  { id: 'menuLinkKakao',  provider: 'kakao',  label: '카카오' },
+];
+
+async function refreshLinkItems() {
+  for (const it of LINK_ITEMS) {
+    $(it.id).disabled = true;
+    $(it.id).textContent = `🔗 ${it.label} 계정 확인 중…`;
+  }
+  let identities = null;
   try {
     const { data, error } = await sb.auth.getUserIdentities();
     if (error) throw error;
-    const linked = (data.identities || []).some((i) => i.provider === 'google');
-    if (linked) {
-      btn.textContent = '✅ 구글 계정 연결됨';
-      btn.disabled = true;      // 이미 연결됐으면 누를 일이 없다
-    } else {
-      btn.textContent = '🔗 구글 계정 연결하기';
-      btn.disabled = false;
-    }
+    identities = data.identities || [];
   } catch (e) {
     // 확인에 실패해도 연결 자체는 시도할 수 있게 열어 둔다
     console.error(e);
-    btn.textContent = '🔗 구글 계정 연결하기';
-    btn.disabled = false;
+  }
+  for (const it of LINK_ITEMS) {
+    const btn = $(it.id);
+    const linked = identities && identities.some((i) => i.provider === it.provider);
+    btn.textContent = linked ? `✅ ${it.label} 계정 연결됨` : `🔗 ${it.label} 계정 연결하기`;
+    btn.disabled = !!linked;     // 이미 연결됐으면 누를 일이 없다
   }
 }
 
-$('menuLinkGoogle').addEventListener('click', async () => {
-  const { error } = await sb.auth.linkIdentity({
-    provider: 'google',
-    options: { redirectTo: location.origin + location.pathname },
+for (const it of LINK_ITEMS) {
+  $(it.id).addEventListener('click', async () => {
+    const { error } = await sb.auth.linkIdentity({
+      provider: it.provider,
+      options: { redirectTo: location.origin + location.pathname },
+    });
+    // 성공하면 이 줄에 닿기 전에 화면이 그쪽으로 넘어간다.
+    if (error) {
+      sheet.classList.add('hidden');
+      alert(translateAuthError(error.message));
+    }
   });
-  // 성공하면 이 줄에 닿기 전에 화면이 구글로 넘어간다.
-  if (error) {
-    sheet.classList.add('hidden');
-    alert(translateAuthError(error.message));
-  }
-});
+}
 
 // 앱을 최신 코드로 다시 받기 (저장해둔 파일을 지우고 새로 내려받습니다)
 $('menuUpdate').addEventListener('click', async () => {

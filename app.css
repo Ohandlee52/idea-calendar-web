@@ -100,6 +100,12 @@ body {
   cursor: pointer;
 }
 .oauth-btn:disabled { opacity: .5; }
+/* 카카오는 노란 바탕에 검은 글씨가 공식 모양이다 */
+.oauth-btn.kakao {
+  background: #FEE500;
+  border-color: #FEE500;
+  color: #191600;
+}
 
 /* "또는 이메일로" — 양옆으로 선이 그어진 구분선 */
 .or-line {

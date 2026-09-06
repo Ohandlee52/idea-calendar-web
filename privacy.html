@@ -1,0 +1,170 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#5b6ef5" />
+  <title>개인정보처리방침 · 아이디어 캘린더</title>
+  <style>
+    :root {
+      --bg: #f7f8fc; --card: #ffffff; --primary: #5b6ef5; --primary-soft: #e8ecff;
+      --text: #2b2f38; --text-soft: #6b7280; --border: #e5e7ef;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; background: var(--bg); color: var(--text);
+      font-family: "맑은 고딕", "Malgun Gothic", "Apple SD Gothic Neo", system-ui, sans-serif;
+      line-height: 1.75; font-size: 15px;
+    }
+    .wrap { max-width: 720px; margin: 0 auto; padding: 28px 20px 64px; }
+    header { padding-bottom: 20px; margin-bottom: 24px; border-bottom: 1px solid var(--border); }
+    h1 { font-size: 22px; margin: 0 0 6px; color: var(--primary); }
+    .sub { margin: 0; font-size: 13.5px; color: var(--text-soft); }
+    h2 {
+      font-size: 16.5px; margin: 32px 0 10px; padding-top: 4px;
+    }
+    p, li { color: var(--text); }
+    ul { padding-left: 20px; margin: 10px 0; }
+    li { margin-bottom: 6px; }
+    .box {
+      background: var(--card); border: 1px solid var(--border); border-radius: 12px;
+      padding: 14px 18px; margin: 12px 0;
+    }
+    .box.accent { background: var(--primary-soft); border-color: var(--primary); }
+    table { width: 100%; border-collapse: collapse; margin: 12px 0; font-size: 14px; }
+    th, td { text-align: left; padding: 9px 10px; border-bottom: 1px solid var(--border); vertical-align: top; }
+    th { background: var(--card); font-weight: 700; width: 34%; }
+    footer {
+      margin-top: 40px; padding-top: 18px; border-top: 1px solid var(--border);
+      font-size: 13px; color: var(--text-soft);
+    }
+    a { color: var(--primary); }
+    .back { display: inline-block; margin-bottom: 18px; font-size: 14px; text-decoration: none; }
+  </style>
+</head>
+<body>
+<div class="wrap">
+
+  <a class="back" href="./">← 아이디어 캘린더로 돌아가기</a>
+
+  <header>
+    <h1>개인정보처리방침</h1>
+    <p class="sub">아이디어 캘린더 (Idea Calendar)</p>
+  </header>
+
+  <p>
+    아이디어 캘린더는 개인이 만들어 가족·지인과 함께 쓰는 메모 앱입니다.
+    이 방침은 이 앱이 어떤 정보를 받아 어디에 두는지를 있는 그대로 적은 것입니다.
+  </p>
+
+  <h2>1. 수집하는 정보</h2>
+
+  <table>
+    <tr>
+      <th>계정 정보</th>
+      <td>이메일 주소<br>
+        구글 계정으로 로그인하시면 구글이 알려주는 <strong>이메일 주소·이름·프로필 사진 주소</strong>를 함께 받습니다.</td>
+    </tr>
+    <tr>
+      <th>메모 내용</th>
+      <td>제목, 본문, 태그, 날짜, 고정 표시, 알림 설정, 작성·수정 시각</td>
+    </tr>
+    <tr>
+      <th>접속 기록</th>
+      <td>로그인 시각 등 서비스 운영에 필요한 최소한의 기록 (Supabase가 자동으로 남김)</td>
+    </tr>
+  </table>
+
+  <div class="box">
+    <strong>비밀번호는 앱이 보관하지 않습니다.</strong>
+    아래 7번의 Supabase가 암호화하여 따로 관리하며, 만든 사람도 원래 비밀번호를 볼 수 없습니다.
+  </div>
+
+  <h2>2. 수집하지 않는 정보</h2>
+  <ul>
+    <li>전화번호, 주소, 생년월일, 주민등록번호</li>
+    <li>위치 정보</li>
+    <li>결제·카드 정보 (이 앱은 무료이며 결제 기능이 없습니다)</li>
+    <li>연락처, 사진첩, 통화 기록 등 기기 안의 다른 자료</li>
+  </ul>
+
+  <h2>3. 이용 목적</h2>
+  <ul>
+    <li>본인 확인 및 로그인</li>
+    <li>메모를 저장하고, 휴대폰과 PC에서 같은 내용을 보여주기</li>
+    <li>설정하신 알림을 제때 띄우기</li>
+  </ul>
+  <p>위 목적 외에는 쓰지 않습니다. 광고에 쓰거나 분석 회사에 넘기지 않습니다.</p>
+
+  <h2>4. 보관 장소 — 국외 이전 안내</h2>
+
+  <div class="box accent">
+    <p style="margin:0">
+      메모와 계정 정보는 <strong>Supabase</strong>(미국 Supabase, Inc.)가 운영하는
+      데이터베이스에 저장되며, 서버는 <strong>아마존웹서비스(AWS) 일본 도쿄 지역</strong>에 있습니다.
+      즉 <strong>정보가 국외(일본)에 보관</strong>됩니다.
+    </p>
+  </div>
+
+  <table>
+    <tr><th>이전받는 자</th><td>Supabase, Inc. (미국) — 서버 소재지: 일본 도쿄</td></tr>
+    <tr><th>이전 항목</th><td>1번에 적은 계정 정보와 메모 내용 전부</td></tr>
+    <tr><th>이전 목적</th><td>메모 저장 및 기기 간 동기화</td></tr>
+    <tr><th>보유 기간</th><td>회원 탈퇴 또는 삭제 요청 시까지</td></tr>
+  </table>
+
+  <p>이 앱을 쓰신다는 것은 위 국외 보관에 동의하시는 것으로 봅니다. 동의하지 않으시면 가입하지 마시기 바랍니다.</p>
+
+  <h2>5. 제3자 제공 및 처리 위탁</h2>
+  <p><strong>제3자에게 판매하거나 제공하지 않습니다.</strong> 다만 서비스를 굴리기 위해 아래 두 곳의 기능을 빌려 씁니다.</p>
+  <table>
+    <tr><th>Supabase, Inc.</th><td>계정 관리, 메모 저장 (위 4번)</td></tr>
+    <tr><th>Google LLC</th><td>구글 계정으로 로그인하실 때만. 구글이 알려주는 이메일·이름·프로필 사진을 받습니다.</td></tr>
+  </table>
+  <p>법령에 따라 수사기관 등이 적법한 절차로 요구하는 경우에는 제공할 수 있습니다.</p>
+
+  <h2>6. 보관 기간과 파기</h2>
+  <ul>
+    <li>계정과 메모는 <strong>탈퇴하실 때까지</strong> 보관합니다.</li>
+    <li>탈퇴하시면 계정과 그 계정의 메모를 함께 지웁니다. 되살릴 수 없습니다.</li>
+    <li>앱에서 메모를 지우시면 목록에서 즉시 사라지며, 기기 간 동기화를 위해 "지움" 표시로 잠시 남았다가 정리됩니다.</li>
+  </ul>
+
+  <h2>7. 안전조치</h2>
+  <ul>
+    <li><strong>다른 사람의 메모는 볼 수 없습니다.</strong> 데이터베이스에 접근 규칙(RLS)을 걸어, 로그인한 본인의 메모만 읽고 쓸 수 있게 해 두었습니다.</li>
+    <li>모든 통신은 암호화(HTTPS)됩니다.</li>
+    <li>비밀번호는 암호화되어 저장되며 원래 값을 아무도 볼 수 없습니다.</li>
+    <li>가입에는 초대코드가 필요하여 아무나 들어올 수 없습니다.</li>
+  </ul>
+
+  <h2>8. 이용자의 권리</h2>
+  <p>언제든지 아래를 하실 수 있습니다.</p>
+  <ul>
+    <li><strong>열람·수정</strong> — 앱에 로그인하시면 내 메모를 모두 보고 고칠 수 있습니다.</li>
+    <li><strong>삭제</strong> — 메모는 앱에서 직접 지우실 수 있습니다.</li>
+    <li><strong>탈퇴 및 전체 삭제</strong> — 아래 문의처로 알려주시면 계정과 메모를 모두 지워드립니다.</li>
+  </ul>
+
+  <h2>9. 만 14세 미만 아동</h2>
+  <p>만 14세 미만은 법정대리인의 동의 없이 가입할 수 없습니다. 이 앱은 만 14세 미만을 대상으로 하지 않습니다.</p>
+
+  <h2>10. 문의처</h2>
+  <div class="box">
+    <p style="margin:0">
+      개인정보에 관한 문의, 열람·수정·삭제 요청은 아래로 연락해 주십시오.<br><br>
+      <strong>이메일: dow610605@gmail.com</strong>
+    </p>
+  </div>
+
+  <h2>11. 방침 변경</h2>
+  <p>내용이 바뀌면 이 쪽에 바뀐 내용과 시행일을 함께 올립니다.</p>
+
+  <footer>
+    시행일: 2026년 9월 6일<br>
+    아이디어 캘린더 · <a href="./">https://ohandlee52.github.io/idea-calendar-web/</a>
+  </footer>
+
+</div>
+</body>
+</html>

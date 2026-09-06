@@ -19,7 +19,7 @@ function readConfig() {
   return null;
 }
 // 앱 버전 (배포할 때마다 올립니다 — 폰이 새 코드를 받았는지 확인용)
-const APP_VERSION = '1.9.1';
+const APP_VERSION = '1.10.0';
 
 const conf = readConfig();
 const configured = !!conf;
@@ -1028,7 +1028,7 @@ $('menuLogout').addEventListener('click', async () => {
 });
 $('menuReport').addEventListener('click', () => {
   sheet.classList.add('hidden');
-  openReport();
+  openRangeSheet();
 });
 
 // ── 📥 PC 메모 가져오기 ──
@@ -1111,12 +1111,107 @@ $('importFile').addEventListener('change', async (e) => {
   alert(`가져오기 완료 ✅\n메모 ${done}개를 가져왔어요.\n지금 총 ${allMemos.length}개입니다.`);
 });
 
-// ── 📄 모아보기 (이번 달 메모를 한 화면에) ──
-function openReport() {
-  const first = dateKey(viewYear, viewMonth, 1);
-  const last = dateKey(viewYear, viewMonth, new Date(viewYear, viewMonth + 1, 0).getDate());
+// ── 📄 모아보기 ──
+// 기간을 고르는 화면을 먼저 띄운다. 자주 쓰는 기간은 단추 하나로 고르게 해
+// 날짜를 두 번 만지지 않아도 되게 했다.
+const rangeSheet = $('rangeSheet'), rangeFrom = $('rangeFrom'), rangeTo = $('rangeTo');
+const rangeInfo = $('rangeInfo');
+
+// 이 앱에서 제일 오래된 메모 날짜 (없으면 오늘)
+function earliestMemoDate() {
+  let min = null;
+  for (const m of allMemos) if (!min || m.date < min) min = m.date;
+  return min || todayKey();
+}
+
+// 오늘부터 n일 전 날짜 (오늘 포함해서 n일이 되도록 n-1을 뺀다)
+function daysAgoKey(n) {
+  const d = new Date();
+  d.setDate(d.getDate() - (n - 1));
+  return dateKey(d.getFullYear(), d.getMonth(), d.getDate());
+}
+
+function presetRange(name) {
+  const t = todayObj();
+  switch (name) {
+    case 'thisMonth':
+      return [dateKey(t.y, t.m, 1),
+              dateKey(t.y, t.m, new Date(t.y, t.m + 1, 0).getDate())];
+    case 'lastMonth': {
+      const d = new Date(t.y, t.m - 1, 1);
+      const y = d.getFullYear(), m = d.getMonth();
+      return [dateKey(y, m, 1), dateKey(y, m, new Date(y, m + 1, 0).getDate())];
+    }
+    case 'days7':    return [daysAgoKey(7), todayKey()];
+    case 'days30':   return [daysAgoKey(30), todayKey()];
+    case 'thisYear': return [dateKey(t.y, 0, 1), dateKey(t.y, 11, 31)];
+    case 'all':      return [earliestMemoDate(), todayKey()];
+    default:         return [todayKey(), todayKey()];
+  }
+}
+
+// 고른 기간에 메모가 몇 개인지 미리 알려 준다. 열어보고 나서
+// "없네" 하는 것보다 고르는 자리에서 아는 편이 낫다.
+function refreshRangeInfo() {
+  const from = rangeFrom.value, to = rangeTo.value;
+  if (!from || !to) {
+    rangeInfo.textContent = '시작과 끝 날짜를 골라 주세요.';
+    rangeInfo.className = 'range-info';
+    $('rangeGo').disabled = true;
+    return;
+  }
+  if (from > to) {
+    rangeInfo.textContent = '시작이 끝보다 늦어요. 날짜를 바꿔 주세요.';
+    rangeInfo.className = 'range-info error';
+    $('rangeGo').disabled = true;
+    return;
+  }
+  const n = Logic.memosInRange(allMemos, from, to).length;
+  rangeInfo.textContent = n ? `이 기간에 메모 ${n}개가 있어요.` : '이 기간에는 메모가 없어요.';
+  rangeInfo.className = 'range-info' + (n ? '' : ' error');
+  $('rangeGo').disabled = n === 0;
+}
+
+function markPreset(name) {
+  for (const b of document.querySelectorAll('.preset-btn')) {
+    b.classList.toggle('on', b.dataset.preset === name);
+  }
+}
+
+function openRangeSheet() {
+  // 기본값은 보고 있는 달. 지금까지 쓰던 동작 그대로다.
+  const [f, l] = [dateKey(viewYear, viewMonth, 1),
+                  dateKey(viewYear, viewMonth, new Date(viewYear, viewMonth + 1, 0).getDate())];
+  rangeFrom.value = f; rangeTo.value = l;
+  const t = todayObj();
+  markPreset(viewYear === t.y && viewMonth === t.m ? 'thisMonth' : '');
+  refreshRangeInfo();
+  rangeSheet.classList.remove('hidden');
+}
+
+for (const b of document.querySelectorAll('.preset-btn')) {
+  b.addEventListener('click', () => {
+    const [f, l] = presetRange(b.dataset.preset);
+    rangeFrom.value = f; rangeTo.value = l;
+    markPreset(b.dataset.preset);
+    refreshRangeInfo();
+  });
+}
+// 날짜를 손으로 고치면 미리 고른 기간 표시를 푼다
+rangeFrom.addEventListener('change', () => { markPreset(''); refreshRangeInfo(); });
+rangeTo.addEventListener('change', () => { markPreset(''); refreshRangeInfo(); });
+$('rangeClose').addEventListener('click', () => rangeSheet.classList.add('hidden'));
+rangeSheet.addEventListener('click', (e) => {
+  if (e.target === rangeSheet) rangeSheet.classList.add('hidden');
+});
+$('rangeGo').addEventListener('click', () => {
+  rangeSheet.classList.add('hidden');
+  openReport(rangeFrom.value, rangeTo.value);
+});
+
+function openReport(first, last) {
   const list = Logic.memosInRange(allMemos, first, last);
-  if (list.length === 0) { alert(`${viewYear}년 ${viewMonth + 1}월에는 메모가 없어요.`); return; }
+  if (list.length === 0) { alert(`${first} ~ ${last} 에는 메모가 없어요.`); return; }
 
   const byDate = {};
   for (const m of list) (byDate[m.date] = byDate[m.date] || []).push(m);

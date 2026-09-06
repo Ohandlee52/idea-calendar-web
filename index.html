@@ -19,7 +19,7 @@
   <meta name="twitter:card" content="summary" />
 
   <link rel="manifest" href="manifest.json" />
-  <link rel="stylesheet" href="app.css?v=1.9.1" />
+  <link rel="stylesheet" href="app.css?v=1.10.0" />
 </head>
 <body>
 
@@ -204,11 +204,42 @@
     </div>
   </div>
 
+  <!-- ───── 모아보기 기간 고르기 ───── -->
+  <div id="rangeSheet" class="sheet hidden">
+    <div class="sheet-box">
+      <div class="sheet-title">📄 모아보기 · 기간 고르기</div>
+
+      <!-- 자주 쓰는 기간은 한 번에 고를 수 있게 -->
+      <div class="range-presets">
+        <button class="preset-btn" data-preset="thisMonth">이번 달</button>
+        <button class="preset-btn" data-preset="lastMonth">지난 달</button>
+        <button class="preset-btn" data-preset="days7">최근 7일</button>
+        <button class="preset-btn" data-preset="days30">최근 30일</button>
+        <button class="preset-btn" data-preset="thisYear">올해</button>
+        <button class="preset-btn" data-preset="all">전체</button>
+      </div>
+
+      <div class="range-row">
+        <label for="rangeFrom">시작</label>
+        <input id="rangeFrom" type="date" />
+      </div>
+      <div class="range-row">
+        <label for="rangeTo">끝</label>
+        <input id="rangeTo" type="date" />
+      </div>
+
+      <p id="rangeInfo" class="range-info"></p>
+
+      <button id="rangeGo" class="primary-btn big">이 기간 모아보기</button>
+      <button id="rangeClose" class="sheet-item cancel">닫기</button>
+    </div>
+  </div>
+
   <!-- Supabase 라이브러리 (최신 2.x — 새 형식의 publishable 키도 지원) -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-  <script src="config.js?v=1.9.1"></script>
-  <script src="logic.js?v=1.9.1"></script>
-  <script src="holidays.js?v=1.9.1"></script>
-  <script src="app.js?v=1.9.1"></script>
+  <script src="config.js?v=1.10.0"></script>
+  <script src="logic.js?v=1.10.0"></script>
+  <script src="holidays.js?v=1.10.0"></script>
+  <script src="app.js?v=1.10.0"></script>
 </body>
 </html>

@@ -636,6 +636,63 @@ body {
 }
 .sheet-item:active { background: var(--primary-soft); }
 .sheet-item.cancel { text-align: center; color: var(--text-soft); margin-top: 4px; }
+
+/* ── 모아보기 기간 고르기 ── */
+/* 자주 쓰는 기간은 한 번에 고르게 한다. 날짜를 두 번 고르는 것보다 훨씬 빠르다 */
+.range-presets {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin: 4px 4px 14px;
+}
+.preset-btn {
+  padding: 11px 4px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--card);
+  color: var(--text);
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+}
+.preset-btn.on {
+  border-color: var(--primary);
+  background: var(--primary-soft);
+  color: var(--primary);
+  font-weight: 700;
+}
+.range-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 0 4px 10px;
+}
+.range-row label {
+  flex: 0 0 40px;
+  font-size: 14px;
+  color: var(--text-soft);
+}
+.range-row input {
+  flex: 1;
+  min-width: 0;
+  padding: 11px 12px;
+  border: 1.5px solid var(--border);
+  border-radius: 10px;
+  background: var(--card);
+  color: var(--text);
+  font-family: inherit;
+  font-size: 15px;
+}
+.range-row input:focus { border-color: var(--primary); outline: none; }
+.range-info {
+  margin: 6px 4px 12px;
+  font-size: 13.5px;
+  color: var(--text-soft);
+  min-height: 20px;
+}
+.range-info.error { color: var(--danger); }
+#rangeGo { margin: 0 4px; width: calc(100% - 8px); }
 .sheet-sub {
   display: block;
   font-size: 12px;

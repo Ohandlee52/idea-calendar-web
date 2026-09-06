@@ -21,7 +21,7 @@
 create table if not exists public.idea_invite_codes (
   code       text primary key,
   note       text not null default '',        -- 누구에게 줄 코드인지 메모 (예: '엄마', '친구 민수')
-  used_by    uuid references auth.users(id),
+  used_by    uuid references auth.users(id) on delete set null,   -- 계정을 지우면 이 기록만 비운다 (안 그러면 계정 삭제가 막힌다)
   used_at    timestamptz,
   created_at timestamptz not null default now()
 );

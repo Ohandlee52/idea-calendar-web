@@ -19,7 +19,7 @@
   <meta name="twitter:card" content="summary" />
 
   <link rel="manifest" href="manifest.json" />
-  <link rel="stylesheet" href="app.css?v=1.11.0" />
+  <link rel="stylesheet" href="app.css?v=1.12.0" />
 </head>
 <body>
 
@@ -172,6 +172,8 @@
     <div class="edit-body">
       <input id="memoTitle" class="edit-title" type="text" placeholder="제목" />
       <textarea id="memoBody" class="edit-content" placeholder="내용을 입력하세요..."></textarea>
+      <!-- PC 앱에서 붙인 사진을 여기에 보여줍니다 (폰에서는 보기만 됩니다) -->
+      <div id="imageRow" class="image-row hidden"></div>
       <div id="linkRow" class="link-row"></div>
       <input id="memoTags" class="edit-tags" type="text"
              placeholder="태그 (쉼표로 구분: 아이디어, 할일)" />
@@ -238,9 +240,9 @@
 
   <!-- Supabase 라이브러리 (최신 2.x — 새 형식의 publishable 키도 지원) -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-  <script src="config.js?v=1.11.0"></script>
-  <script src="logic.js?v=1.11.0"></script>
-  <script src="holidays.js?v=1.11.0"></script>
-  <script src="app.js?v=1.11.0"></script>
+  <script src="config.js?v=1.12.0"></script>
+  <script src="logic.js?v=1.12.0"></script>
+  <script src="holidays.js?v=1.12.0"></script>
+  <script src="app.js?v=1.12.0"></script>
 </body>
 </html>

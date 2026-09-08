@@ -19,7 +19,7 @@ function readConfig() {
   return null;
 }
 // 앱 버전 (배포할 때마다 올립니다 — 폰이 새 코드를 받았는지 확인용)
-const APP_VERSION = '1.11.0';
+const APP_VERSION = '1.12.0';
 
 const conf = readConfig();
 const configured = !!conf;
@@ -36,7 +36,7 @@ const listTitle = $('listTitle'), memoList = $('memoList'), syncStatus = $('sync
 const searchBar = $('searchBar'), searchInput = $('searchInput');
 const reminderBar = $('reminderBar');
 const titleInput = $('memoTitle'), bodyInput = $('memoBody'), tagsInput = $('memoTags');
-const linkRow = $('linkRow'), reminderRows = $('reminderRows');
+const linkRow = $('linkRow'), imageRow = $('imageRow'), reminderRows = $('reminderRows');
 const editDate = $('editDate'), editMeta = $('editMeta'), pinBtn = $('pinBtn');
 const sheet = $('sheet');
 
@@ -414,7 +414,9 @@ function memoCard(memo, showDate) {
   const pin = memo.pinned ? '📌 ' : '';
   const bell = (memo.reminders || []).some((r) => !r.done) ? ' 🔔' : '';
   const title = memo.title.trim() || '(제목 없음)';
-  const snippet = memo.body.trim().slice(0, 60) || '(내용 없음)';
+  const hasImg = extractImages(memo.bodyHtml).length > 0;
+  const snippet = memo.body.trim().slice(0, 60)
+    || (hasImg ? '🖼 사진' : '(내용 없음)');
   card.innerHTML = `
     ${showDate ? `<div class="c-date">📅 ${Logic.escapeHtml(memo.date)}</div>` : ''}
     <div class="c-title">${pin}${Logic.escapeHtml(title)}${bell}</div>
@@ -566,6 +568,7 @@ function openMemo(memo) {
   current = memo; currentIsNew = false;
   titleInput.value = memo.title;
   bodyInput.value = memo.body;
+  renderImageRow();
   tagsInput.value = memo.tags.join(', ');
   editDate.textContent = memo.date;
   editMeta.textContent = `수정 ${fmtDateTime(memo.updatedAt)}`;
@@ -583,6 +586,7 @@ function newMemo() {
   };
   currentIsNew = true;
   titleInput.value = ''; bodyInput.value = ''; tagsInput.value = '';
+  renderImageRow();
   editDate.textContent = selectedKey;
   editMeta.textContent = '새 메모';
   refreshEditControls();
@@ -671,6 +675,62 @@ async function commitCurrent() {
     editMeta.textContent = `수정 ${fmtDateTime(current.updatedAt)}`;
     renderCalendar(); renderList(); renderReminderBar();
   }
+}
+
+// ── PC 앱에서 붙인 사진 보여주기 ──
+// PC 앱은 사진을 파일이 아니라 메모 안에 통째로(base64) 넣어 둡니다.
+// 그래서 폰에서도 인터넷 없이 그대로 보여줄 수 있습니다.
+//
+// ⚠️ 저장된 HTML 을 그대로 화면에 붙이지 않습니다. 그건 위험한 방식입니다.
+//    사진 주소만 뽑아내서, 우리가 만든 <img> 에 넣습니다.
+//    data:image 형식만 받으므로 바깥으로 나가는 주소가 섞일 수 없습니다.
+function extractImages(bodyHtml) {
+  if (!bodyHtml) return [];
+  const re = /<img[^>]+src=["'](data:image\/(?:png|jpe?g|gif|webp);base64,[A-Za-z0-9+/=]+)["']/gi;
+  const out = [];
+  let m;
+  while ((m = re.exec(bodyHtml)) !== null) out.push(m[1]);
+  return out;
+}
+
+function renderImageRow() {
+  imageRow.innerHTML = '';
+  const srcs = current ? extractImages(current.bodyHtml) : [];
+  if (srcs.length === 0) { imageRow.classList.add('hidden'); return; }
+  imageRow.classList.remove('hidden');
+
+  const head = document.createElement('div');
+  head.className = 'ir-head';
+  head.textContent = `🖼 PC에서 붙인 사진 ${srcs.length}장`;
+  imageRow.appendChild(head);
+
+  for (const src of srcs) {
+    const img = document.createElement('img');
+    img.className = 'ir-img';
+    img.src = src;
+    img.alt = '첨부 사진';
+    // loading="lazy" 를 쓰면 안 됩니다. 사진이 이미 메모 안에 들어 있어
+    // 미뤄 받을 것이 없는데, 브라우저가 로드를 미루기만 하고 끝내
+    // 그리지 않아 빈 칸으로 남습니다 (실제로 그렇게 됐습니다).
+    img.loading = 'eager';
+    // 눌러서 크게 보기 (새 탭)
+    img.addEventListener('click', () => {
+      const w = window.open('', '_blank');
+      if (w) {
+        const box = w.document.createElement('img');
+        box.src = src;
+        box.style.cssText = 'max-width:100%;height:auto;display:block;margin:0 auto';
+        w.document.body.style.cssText = 'margin:0;background:#111';
+        w.document.body.appendChild(box);
+      }
+    });
+    imageRow.appendChild(img);
+  }
+
+  const note = document.createElement('div');
+  note.className = 'ir-note';
+  note.textContent = '사진은 PC 앱에서만 넣고 지울 수 있어요. 폰에서는 보기만 됩니다.';
+  imageRow.appendChild(note);
 }
 
 // ── 예약 알림 ──

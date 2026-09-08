@@ -19,7 +19,7 @@ function readConfig() {
   return null;
 }
 // 앱 버전 (배포할 때마다 올립니다 — 폰이 새 코드를 받았는지 확인용)
-const APP_VERSION = '1.16.0';
+const APP_VERSION = '1.16.1';
 
 const conf = readConfig();
 const configured = !!conf;
@@ -1016,7 +1016,7 @@ async function runAnalysis() {
   aiBusy = true;
   const btn = $('aiBtn');
   btn.disabled = true;
-  btn.textContent = '⏳ 분석 중…';
+  btn.textContent = '분석 중…';          // 모래시계는 결과 칸에만 (이중 표시 방지)
   renderAnalysis(null, { loading: true });
   aiRow.scrollIntoView({ behavior: 'smooth', block: 'center' });   // 진행 칸이 눈에 보이게
   syncBusy('AI 분석 중…');

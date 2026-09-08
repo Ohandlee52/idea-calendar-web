@@ -19,7 +19,7 @@ function readConfig() {
   return null;
 }
 // 앱 버전 (배포할 때마다 올립니다 — 폰이 새 코드를 받았는지 확인용)
-const APP_VERSION = '1.13.0';
+const APP_VERSION = '1.13.1';
 
 const conf = readConfig();
 const configured = !!conf;
@@ -801,17 +801,43 @@ function buildBodyHtml(body, images) {
   return (text ? `<div>${text}</div>` : '') + `<div>${imgs}</div>`;
 }
 
+// 실패했을 때 무엇이 문제인지 알 수 있게 파일 정보와 짐작되는 원인을 함께 보여준다.
+// (문구만 봐서는 HEIC 형식인지, 빈 파일인지 구분이 안 됐다 — 실제로 그런 일이 있었다)
+function describePhotoFile(file) {
+  const kb = Math.round((file.size || 0) / 1024);
+  return `파일: ${file.name || '(이름 없음)'}\n형식: ${file.type || '(알 수 없음)'}\n크기: ${kb} KB`;
+}
+function guessPhotoProblem(file) {
+  const name = (file.name || '').toLowerCase();
+  const type = (file.type || '').toLowerCase();
+  if (/heic|heif/.test(type) || /\.hei[cf]$/.test(name)) {
+    return '이 사진은 "고효율(HEIC)" 형식이라 브라우저가 읽지 못합니다.\n'
+         + '카메라 설정에서 [고효율 사진]을 끄고 다시 찍거나,\n'
+         + '갤러리에서 JPG로 바꿔 저장한 뒤 붙여 주세요.';
+  }
+  if (!file.size) {
+    return '파일이 비어 있습니다. 클라우드(구글 포토 등)에만 있고\n'
+         + '폰에 내려받지 않은 사진일 수 있어요. 갤러리에서 한 번 열어 본 뒤 다시 해보세요.';
+  }
+  return '사진 파일이 손상됐거나 폰이 지원하지 않는 형식일 수 있어요.';
+}
+
 async function addPhoto(file) {
   if (!current) return false;
-  if (!file || !/^image\//.test(file.type)) { alert('사진 파일만 붙일 수 있어요.'); return false; }
+  if (!file || !/^image\//.test(file.type)) {
+    // 형식을 못 알아본 HEIC 도 있다 (type 이 비어 옴). 이름으로라도 알려준다.
+    const hint = file && /\.hei[cf]$/i.test(file.name || '') ? guessPhotoProblem(file) : '사진 파일만 붙일 수 있어요.';
+    alert(`${hint}\n\n${file ? describePhotoFile(file) : ''}`);
+    return false;
+  }
   syncBusy('사진 줄이는 중…');
   let dataUrl;
   try {
     dataUrl = await shrinkToJpeg(file);
   } catch (e) {
-    console.error('사진 처리 실패:', e);
+    console.error('사진 처리 실패:', e, file && file.name, file && file.type, file && file.size);
     syncFlash('⚠️ 사진을 붙이지 못했어요', 3000);
-    alert(`사진을 붙이지 못했어요.\n${e.message || e}`);
+    alert(`사진을 붙이지 못했어요.\n\n${guessPhotoProblem(file)}\n\n${describePhotoFile(file)}`);
     return false;
   }
   const images = extractImages(current.bodyHtml);

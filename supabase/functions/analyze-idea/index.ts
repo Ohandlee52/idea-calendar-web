@@ -20,10 +20,10 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 // 1회 657원이 나왔다. Sonnet 5 + 검색 3번 + 짧은 답으로 약 100원 안팎을 목표로 한다.
 // 더 깊게 보고 싶으면 MODEL 을 "claude-opus-5" 로, 검색을 4~6으로 올리면 된다.
 const MODEL = "claude-sonnet-5";
-const EFFORT = "medium";         // 생각 깊이: low / medium / high
+const EFFORT = "high";           // 생각 깊이: low / medium / high (medium 은 검색을 대충 써서 high 로 올림)
 const MAX_TOKENS = 3000;         // 답 길이 상한
 const DAILY_LIMIT = 10;          // 한 사람이 하루에 돌릴 수 있는 횟수 (비용 보호)
-const MAX_WEB_SEARCHES = 3;      // 한 번 분석에 허용하는 웹 검색 횟수
+const MAX_WEB_SEARCHES = 4;      // 한 번 분석에 허용하는 웹 검색 횟수
 const MIN_TEXT_LENGTH = 5;
 
 // 1회 비용 어림값 (원). 표시용이며 정확한 청구액은 Anthropic 콘솔이 기준이다.
@@ -43,9 +43,12 @@ const SYSTEM_PROMPT = `당신은 사업 아이디어를 냉정하게 검토해 �
 
 규칙:
 - 메모가 짧고 거칠어도 그 안의 핵심 의도를 먼저 한 줄로 요약한 뒤 분석합니다.
-- 웹 검색은 3번까지만 됩니다. 순서를 지킵니다: 1번째와 2번째 검색은 반드시 "같은 아이디어가 이미 있는지"(기존 제품·서비스·앱)를 찾는 데 씁니다. 3번째만 시장·정책 확인에 씁니다.
-- 찾은 사례는 이름과 출처(사이트 이름)를 적습니다. 찾지 못했으면 "찾지 못함"이라고만 씁니다. 지어내지 않습니다.
-- "검색 한도", "도구 사용 횟수" 같은 내부 사정은 답에 쓰지 않습니다. 사용자는 찾은 것과 못 찾은 것만 알면 됩니다.
+- 웹 검색은 4번까지 됩니다. 순서를 지킵니다: 1번째·2번째 검색은 반드시 "같은 아이디어가 이미 있는지"(기존 제품·서비스·앱)를 찾는 데 씁니다. 한국어로 한 번, 영어로 한 번 검색합니다. 3·4번째만 시장·정책 확인에 씁니다.
+- "이미 있는 것" 항목에는 검색에서 나온 가장 가까운 기존 제품·서비스를 2~3개, 각각 이름 + 무엇을 하는지 한 문장 + 출처(사이트 이름)로 적습니다. 이 항목이 이 분석의 핵심입니다.
+- 정확히 같은 것이 없으면 "똑같은 것은 없고, 가장 가까운 것은 ○○"라고 씁니다. 두 번 검색해도 관련 결과가 전혀 없을 때만 "찾지 못함"이라고 씁니다.
+- "직접 검색해 보세요", "별도 확인이 필요합니다" 같은 말은 쓰지 않습니다. 확인은 당신이 하는 일입니다.
+- "검색 한도", "도구 사용 횟수" 같은 내부 사정은 답에 쓰지 않습니다.
+- 검색 결과에 없는 제품 이름을 지어내지 않습니다.
 - 칭찬으로 채우지 않습니다. 약점과 위험을 구체적으로 씁니다.
 - 짧게 씁니다. 각 항목은 2~3문장, 전체 600자 안팎. 표나 코드블록은 쓰지 않습니다.
 - 마지막에 "한 줄 판단"으로 실행 가치를 1~5점으로 매기고 이유를 한 문장 붙입니다.
@@ -198,6 +201,19 @@ Deno.serve(async (req: Request) => {
           }],
           messages: [{ role: "user", content: userPrompt }],
         });
+
+        // 검색을 실제로 어떻게 썼는지 서버 기록에 남긴다 (Supabase → Edge Functions → Logs 에서 봄).
+        // "찾지 못함"이 자꾸 나오면 여기서 검색어가 이상한지, 결과가 비었는지 확인한다.
+        for (const b of msg.content as Array<Record<string, unknown>>) {
+          if (b.type === "server_tool_use") {
+            console.log("검색어:", JSON.stringify((b.input as { query?: string })?.query ?? b.input));
+          } else if (b.type === "web_search_tool_result") {
+            const c = b.content as unknown;
+            const n = Array.isArray(c) ? c.length : -1;
+            const err = !Array.isArray(c) && c && typeof c === "object" ? (c as { error_code?: string }).error_code : undefined;
+            console.log("검색 결과:", n >= 0 ? `${n}건` : `오류 ${err ?? "?"}`);
+          }
+        }
 
         if (msg.stop_reason === "refusal") {
           await finish({ ok: false, error: "AI 가 이 내용의 분석을 거절했습니다." });

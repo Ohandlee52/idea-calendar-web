@@ -172,7 +172,7 @@
     <div class="edit-body">
       <input id="memoTitle" class="edit-title" type="text" placeholder="제목" />
       <textarea id="memoBody" class="edit-content" placeholder="내용을 입력하세요..."></textarea>
-      <!-- PC 앱에서 붙인 사진을 여기에 보여줍니다 (폰에서는 보기만 됩니다) -->
+      <!-- 붙인 사진을 여기에 보여줍니다 (폰·PC 어디서 붙였든) -->
       <div id="imageRow" class="image-row hidden"></div>
       <div id="linkRow" class="link-row"></div>
       <input id="memoTags" class="edit-tags" type="text"
@@ -181,6 +181,9 @@
       <div class="edit-controls">
         <button id="pinBtn" class="chip-btn">📌 고정</button>
         <button id="addReminderBtn" class="chip-btn">🔔 알림 추가</button>
+        <!-- 사진 붙이기. 안 누르면 아무것도 안 바뀝니다 (메모 쓰는 단계 수는 그대로) -->
+        <button id="photoBtn" class="chip-btn">📷 사진</button>
+        <input id="photoInput" type="file" accept="image/*" hidden />
       </div>
       <div id="reminderRows" class="reminder-rows"></div>
       <div id="editMeta" class="edit-meta"></div>

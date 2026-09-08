@@ -52,6 +52,7 @@ const selectedIds = new Set();
 // 고정 메모는 기본 8개까지만 타일로 보여 준다. 나머지는 눌러서 펼친다.
 let pinnedExpanded = false;
 let current = null, currentIsNew = false;
+let loadedBody = '';      // 편집칸을 열 때의 본문 (폰에서 글을 고쳤는지 판단용)
 let searchQuery = '';
 let saveTimer = null;
 const notifiedIds = new Set();
@@ -566,6 +567,7 @@ function closeEditView() { editView.classList.add('hidden'); mainView.classList.
 
 function openMemo(memo) {
   current = memo; currentIsNew = false;
+  loadedBody = memo.body;
   titleInput.value = memo.title;
   bodyInput.value = memo.body;
   renderImageRow();
@@ -585,6 +587,7 @@ function newMemo() {
     createdAt: nowISO(), updatedAt: nowISO(),
   };
   currentIsNew = true;
+  loadedBody = '';
   titleInput.value = ''; bodyInput.value = ''; tagsInput.value = '';
   renderImageRow();
   editDate.textContent = selectedKey;
@@ -664,8 +667,17 @@ async function commitCurrent() {
   const title = titleInput.value;
   const body = bodyInput.value;
   const tags = Logic.parseTags(tagsInput.value);
-  const isEmpty = !title.trim() && !body.trim() && tags.length === 0;
+  const images = extractImages(current.bodyHtml);
+  const isEmpty = !title.trim() && !body.trim() && tags.length === 0 && images.length === 0;
   if (currentIsNew && isEmpty) return;   // 빈 메모는 저장하지 않음
+
+  // PC 앱은 bodyHtml 이 있으면 body 대신 그것을 보여준다. 그래서 사진이 있는
+  // 메모의 글을 폰에서 고쳤다면 bodyHtml 도 새 글로 다시 만들어야 PC에 반영된다.
+  // 글을 안 고쳤으면 그대로 둔다 (PC에서 준 굵게·색깔 같은 서식을 지키기 위해).
+  if (current.bodyHtml && body !== loadedBody) {
+    current.bodyHtml = buildBodyHtml(body, images);
+  }
+  loadedBody = body;
 
   current.title = title; current.body = body; current.tags = tags;
   current.updatedAt = nowISO();
@@ -701,10 +713,12 @@ function renderImageRow() {
 
   const head = document.createElement('div');
   head.className = 'ir-head';
-  head.textContent = `🖼 PC에서 붙인 사진 ${srcs.length}장`;
+  head.textContent = `🖼 사진 ${srcs.length}장`;
   imageRow.appendChild(head);
 
   for (const src of srcs) {
+    const box = document.createElement('div');
+    box.className = 'ir-box';
     const img = document.createElement('img');
     img.className = 'ir-img';
     img.src = src;
@@ -724,14 +738,106 @@ function renderImageRow() {
         w.document.body.appendChild(box);
       }
     });
-    imageRow.appendChild(img);
-  }
+    box.appendChild(img);
 
-  const note = document.createElement('div');
-  note.className = 'ir-note';
-  note.textContent = '사진은 PC 앱에서만 넣고 지울 수 있어요. 폰에서는 보기만 됩니다.';
-  imageRow.appendChild(note);
+    const del = document.createElement('button');
+    del.type = 'button';
+    del.className = 'ir-del';
+    del.textContent = '✕';
+    del.title = '이 사진 지우기';
+    del.addEventListener('click', async () => {
+      if (!confirm('이 사진을 지울까요?')) return;
+      await removePhoto(src);
+    });
+    box.appendChild(del);
+    imageRow.appendChild(box);
+  }
 }
+
+// ── 폰에서 사진 붙이기 ──
+// PC 앱과 같은 규칙으로 줄여서(긴 변 1000px) 메모 안에 담는다.
+// 단, 폰에서는 항상 JPEG 로 저장한다. PC처럼 PNG 를 PNG 그대로 두면 폰 화면 캡처가
+// 10배(1.3MB)로 커진다 — 실제로 재봤다: JPEG 128KB / PNG 1,364KB.
+const PHOTO_MAX_SIDE = 1000;
+const PHOTO_QUALITY = 0.72;
+
+async function loadPicture(file) {
+  // 폰 사진은 EXIF 회전 정보가 있어 그대로 그리면 옆으로 눕는다. 그걸 반영해 읽는다.
+  if (window.createImageBitmap) {
+    try { return await createImageBitmap(file, { imageOrientation: 'from-image' }); }
+    catch (e) { console.warn('createImageBitmap 실패, <img>로 대신 읽음:', e); }
+  }
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => { URL.revokeObjectURL(url); resolve(img); };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('사진 파일을 읽지 못했습니다')); };
+    img.src = url;
+  });
+}
+
+async function shrinkToJpeg(file) {
+  const pic = await loadPicture(file);
+  const w0 = pic.width, h0 = pic.height;
+  if (!w0 || !h0) throw new Error('사진 크기를 알 수 없습니다');
+  const scale = Math.min(1, PHOTO_MAX_SIDE / Math.max(w0, h0));
+  const w = Math.round(w0 * scale), h = Math.round(h0 * scale);
+  const canvas = document.createElement('canvas');
+  canvas.width = w; canvas.height = h;
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#fff';            // PNG 의 투명 부분이 검게 되지 않게
+  ctx.fillRect(0, 0, w, h);
+  ctx.drawImage(pic, 0, 0, w, h);
+  if (pic.close) pic.close();
+  return canvas.toDataURL('image/jpeg', PHOTO_QUALITY);
+}
+
+// 글 + 사진들로 PC 앱이 읽는 bodyHtml 을 만든다.
+// PC 앱이 허용하는 태그(DIV, BR, IMG)만 쓴다. 글은 반드시 escape 한다.
+function buildBodyHtml(body, images) {
+  const text = Logic.escapeHtml(body || '').replace(/\r?\n/g, '<br>');
+  const imgs = images.map((src) => `<img class="memo-img" src="${src}" alt="첨부 이미지">`).join('<br>');
+  if (!imgs) return text ? `<div>${text}</div>` : '';
+  return (text ? `<div>${text}</div>` : '') + `<div>${imgs}</div>`;
+}
+
+async function addPhoto(file) {
+  if (!current) return false;
+  if (!file || !/^image\//.test(file.type)) { alert('사진 파일만 붙일 수 있어요.'); return false; }
+  syncBusy('사진 줄이는 중…');
+  let dataUrl;
+  try {
+    dataUrl = await shrinkToJpeg(file);
+  } catch (e) {
+    console.error('사진 처리 실패:', e);
+    syncFlash('⚠️ 사진을 붙이지 못했어요', 3000);
+    alert(`사진을 붙이지 못했어요.\n${e.message || e}`);
+    return false;
+  }
+  const images = extractImages(current.bodyHtml);
+  images.push(dataUrl);
+  current.bodyHtml = buildBodyHtml(bodyInput.value, images);
+  loadedBody = bodyInput.value;          // 방금 bodyHtml 에 반영했으니 기준을 맞춘다
+  renderImageRow();
+  await commitCurrent();                 // 미루지 않고 바로 저장 (사진은 잃으면 아깝다)
+  return true;
+}
+
+async function removePhoto(src) {
+  if (!current) return;
+  const images = extractImages(current.bodyHtml).filter((s) => s !== src);
+  current.bodyHtml = buildBodyHtml(bodyInput.value, images);
+  loadedBody = bodyInput.value;
+  renderImageRow();
+  await commitCurrent();
+}
+
+$('photoBtn').addEventListener('click', () => $('photoInput').click());
+$('photoInput').addEventListener('change', async (e) => {
+  const file = e.target.files && e.target.files[0];
+  e.target.value = '';                   // 같은 사진을 다시 골라도 change 가 뜨게
+  if (file) await addPhoto(file);
+});
 
 // ── 예약 알림 ──
 function getDue() { return Logic.dueReminders(allMemos, nowStamp()); }

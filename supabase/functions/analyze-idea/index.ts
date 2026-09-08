@@ -16,15 +16,26 @@
 import Anthropic from "npm:@anthropic-ai/sdk";
 import { createClient } from "npm:@supabase/supabase-js@2";
 
-const MODEL = "claude-opus-5";
+// 절약형 설정 (2026-09-09 대표님 결정). 처음엔 Opus 5 + 검색 6번 + 긴 답이었는데
+// 1회 657원이 나왔다. Sonnet 5 + 검색 3번 + 짧은 답으로 약 100원 안팎을 목표로 한다.
+// 더 깊게 보고 싶으면 MODEL 을 "claude-opus-5" 로, 검색을 4~6으로 올리면 된다.
+const MODEL = "claude-sonnet-5";
+const EFFORT = "medium";         // 생각 깊이: low / medium / high
+const MAX_TOKENS = 3000;         // 답 길이 상한
 const DAILY_LIMIT = 10;          // 한 사람이 하루에 돌릴 수 있는 횟수 (비용 보호)
-const MAX_WEB_SEARCHES = 6;      // 한 번 분석에 허용하는 웹 검색 횟수
+const MAX_WEB_SEARCHES = 3;      // 한 번 분석에 허용하는 웹 검색 횟수
 const MIN_TEXT_LENGTH = 5;
 
 // 1회 비용 어림값 (원). 표시용이며 정확한 청구액은 Anthropic 콘솔이 기준이다.
-// Opus 5: 입력 $5/100만 토큰, 출력 $25/100만 토큰, 웹 검색 $10/1000회. 환율 1,400원 가정.
-function estimateCostKrw(inputTokens: number, outputTokens: number, searches: number): number {
-  const usd = (inputTokens / 1e6) * 5 + (outputTokens / 1e6) * 25 + (searches / 1000) * 10;
+// 100만 토큰당 단가(달러): Opus 5 입력 5 / 출력 25, Sonnet 5 입력 2 / 출력 10.
+// 웹 검색은 1000회당 $10. 환율 1,400원 가정.
+const PRICE: Record<string, { input: number; output: number }> = {
+  "claude-opus-5": { input: 5, output: 25 },
+  "claude-sonnet-5": { input: 2, output: 10 },
+};
+function estimateCostKrw(model: string, inputTokens: number, outputTokens: number, searches: number): number {
+  const p = PRICE[model] ?? PRICE["claude-opus-5"];   // 모르는 모델이면 비싼 쪽으로 어림
+  const usd = (inputTokens / 1e6) * p.input + (outputTokens / 1e6) * p.output + (searches / 1000) * 10;
   return Math.round(usd * 1400);
 }
 
@@ -32,9 +43,9 @@ const SYSTEM_PROMPT = `당신은 사업 아이디어를 냉정하게 검토해 �
 
 규칙:
 - 메모가 짧고 거칠어도 그 안의 핵심 의도를 먼저 한 줄로 요약한 뒤 분석합니다.
-- "이미 있는 아이디어인지"는 반드시 웹 검색으로 확인하고, 찾은 사례는 이름과 출처(사이트 이름)를 적습니다. 찾지 못했으면 "찾지 못함"이라고 씁니다. 지어내지 않습니다.
+- "이미 있는 아이디어인지"는 웹 검색으로 확인하고(최대 3번), 찾은 사례는 이름과 출처(사이트 이름)를 적습니다. 찾지 못했으면 "찾지 못함"이라고 씁니다. 지어내지 않습니다.
 - 칭찬으로 채우지 않습니다. 약점과 위험을 구체적으로 씁니다.
-- 각 항목은 짧은 문장 여러 개로 씁니다. 표나 코드블록은 쓰지 않습니다.
+- 짧게 씁니다. 각 항목은 2~3문장, 전체 600자 안팎. 표나 코드블록은 쓰지 않습니다.
 - 마지막에 "한 줄 판단"으로 실행 가치를 1~5점으로 매기고 이유를 한 문장 붙입니다.
 
 출력 형식 (제목 줄은 이대로, 순서대로):
@@ -173,10 +184,10 @@ Deno.serve(async (req: Request) => {
         // (SDK 가 max_tokens 크기에 맞춰 대기 시간을 늘려 준다)
         const msg = await client.messages.create({
           model: MODEL,
-          max_tokens: 8000,
+          max_tokens: MAX_TOKENS,
           system: SYSTEM_PROMPT,
           thinking: { type: "adaptive" },
-          output_config: { effort: "high" },
+          output_config: { effort: EFFORT },
           tools: [{
             type: "web_search_20260209",
             name: "web_search",
@@ -219,7 +230,7 @@ Deno.serve(async (req: Request) => {
           input_tokens: inputTokens,
           output_tokens: outputTokens,
           web_searches: searches,
-          cost_krw: estimateCostKrw(inputTokens, outputTokens, searches),
+          cost_krw: estimateCostKrw(msg.model, inputTokens, outputTokens, searches),
         };
         const { data: saved, error: saveErr } = await supabase
           .from("idea_analyses")

@@ -19,7 +19,7 @@ function readConfig() {
   return null;
 }
 // 앱 버전 (배포할 때마다 올립니다 — 폰이 새 코드를 받았는지 확인용)
-const APP_VERSION = '1.13.1';
+const APP_VERSION = '1.14.0';
 
 const conf = readConfig();
 const configured = !!conf;
@@ -801,6 +801,40 @@ function buildBodyHtml(body, images) {
   return (text ? `<div>${text}</div>` : '') + `<div>${imgs}</div>`;
 }
 
+// ── HEIC(고효율) 사진 ──
+// 갤럭시·아이폰이 "고효율 사진"으로 찍으면 HEIC 형식이 되는데, 크롬은 이걸 못 읽는다.
+// 그래서 앱 안에 변환기(heic2any, MIT)를 두고 폰에서 JPG 로 바꾼 뒤 붙인다.
+// 변환기는 1.3MB 라 평소엔 안 불러오고, HEIC 사진을 골랐을 때만 한 번 불러온다.
+function isHeicFile(file) {
+  if (!file) return false;
+  return /hei[cf]/i.test(file.type || '') || /\.hei[cf]$/i.test(file.name || '');
+}
+
+const loadedScripts = {};
+function loadScriptOnce(src) {
+  if (!loadedScripts[src]) {
+    loadedScripts[src] = new Promise((resolve, reject) => {
+      const el = document.createElement('script');
+      el.src = src;
+      el.onload = resolve;
+      el.onerror = () => { delete loadedScripts[src]; reject(new Error('변환기를 내려받지 못했습니다 (인터넷 확인)')); };
+      document.head.appendChild(el);
+    });
+  }
+  return loadedScripts[src];
+}
+
+async function convertHeicToJpeg(file) {
+  syncBusy('HEIC 사진 변환 중… (몇 초 걸려요)');
+  await loadScriptOnce(`vendor/heic2any.min.js?v=${APP_VERSION}`);
+  if (typeof heic2any !== 'function') throw new Error('변환기가 준비되지 않았습니다');
+  // 여기서는 품질을 높게 두고, 크기 줄이기는 뒤의 shrinkToJpeg 가 한 번 더 한다.
+  const out = await heic2any({ blob: file, toType: 'image/jpeg', quality: 0.92 });
+  const blob = Array.isArray(out) ? out[0] : out;
+  if (!blob || !blob.size) throw new Error('변환 결과가 비어 있습니다');
+  return new File([blob], (file.name || 'photo').replace(/\.hei[cf]$/i, '') + '.jpg', { type: 'image/jpeg' });
+}
+
 // 실패했을 때 무엇이 문제인지 알 수 있게 파일 정보와 짐작되는 원인을 함께 보여준다.
 // (문구만 봐서는 HEIC 형식인지, 빈 파일인지 구분이 안 됐다 — 실제로 그런 일이 있었다)
 function describePhotoFile(file) {
@@ -811,9 +845,9 @@ function guessPhotoProblem(file) {
   const name = (file.name || '').toLowerCase();
   const type = (file.type || '').toLowerCase();
   if (/heic|heif/.test(type) || /\.hei[cf]$/.test(name)) {
-    return '이 사진은 "고효율(HEIC)" 형식이라 브라우저가 읽지 못합니다.\n'
-         + '카메라 설정에서 [고효율 사진]을 끄고 다시 찍거나,\n'
-         + '갤러리에서 JPG로 바꿔 저장한 뒤 붙여 주세요.';
+    return '이 "고효율(HEIC)" 사진을 JPG로 바꾸지 못했어요.\n'
+         + '인터넷이 켜져 있는지 확인하고 다시 해보세요.\n'
+         + '계속 안 되면 카메라 설정에서 [고효율 사진]을 끄고 찍어 주세요.';
   }
   if (!file.size) {
     return '파일이 비어 있습니다. 클라우드(구글 포토 등)에만 있고\n'
@@ -824,17 +858,18 @@ function guessPhotoProblem(file) {
 
 async function addPhoto(file) {
   if (!current) return false;
-  if (!file || !/^image\//.test(file.type)) {
-    // 형식을 못 알아본 HEIC 도 있다 (type 이 비어 옴). 이름으로라도 알려준다.
-    const hint = file && /\.hei[cf]$/i.test(file.name || '') ? guessPhotoProblem(file) : '사진 파일만 붙일 수 있어요.';
-    alert(`${hint}\n\n${file ? describePhotoFile(file) : ''}`);
+  if (!file || (!/^image\//.test(file.type) && !isHeicFile(file))) {
+    alert(`사진 파일만 붙일 수 있어요.\n\n${file ? describePhotoFile(file) : ''}`);
     return false;
   }
-  syncBusy('사진 줄이는 중…');
+  const original = file;
   let dataUrl;
   try {
+    if (isHeicFile(file)) file = await convertHeicToJpeg(file);
+    syncBusy('사진 줄이는 중…');
     dataUrl = await shrinkToJpeg(file);
   } catch (e) {
+    file = original;   // 안내문에는 원래 고른 파일 정보를 보여준다
     console.error('사진 처리 실패:', e, file && file.name, file && file.type, file && file.size);
     syncFlash('⚠️ 사진을 붙이지 못했어요', 3000);
     alert(`사진을 붙이지 못했어요.\n\n${guessPhotoProblem(file)}\n\n${describePhotoFile(file)}`);

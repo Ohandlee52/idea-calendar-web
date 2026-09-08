@@ -128,7 +128,12 @@ Deno.serve(async (req: Request) => {
       return json({ error: `하루 ${DAILY_LIMIT}번까지만 분석할 수 있어요. 내일 다시 해주세요.` }, 429);
     }
 
-    // 4) AI 에게 묻기
+    // 4) AI 에게 묻기 — 여기서부터 30초~2분이 걸린다.
+    //    그동안 아무것도 안 보내면 중간 서버(Cloudflare)가 100초쯤에 연결을 끊고,
+    //    폰은 "서버에 연결하지 못했어요"를 본다 (실제로 그랬다).
+    //    그래서 응답 머리를 먼저 열고 5초마다 빈칸 한 글자를 흘려보낸 뒤, 끝에 JSON 을 쓴다.
+    //    JSON 앞의 빈칸은 규격상 허용되어 폰 쪽(supabase-js)이 그대로 읽는다.
+    //    머리를 먼저 보내므로 이 뒤의 오류는 HTTP 상태가 아니라 본문 {ok:false, error} 로 전한다.
     const apiKey = Deno.env.get("ANTHROPIC_API_KEY");
     if (!apiKey) return json({ error: "서버에 AI 열쇠(ANTHROPIC_API_KEY)가 등록되지 않았습니다" }, 500);
     const client = new Anthropic({ apiKey });
@@ -142,80 +147,122 @@ Deno.serve(async (req: Request) => {
       bodyText || "(본문 없음)",
     ].filter((l) => l !== "").join("\n");
 
-    // 출력이 길어야 몇천 토큰이라 스트리밍 없이 한 번에 받는다.
-    // (SDK 가 max_tokens 크기에 맞춰 대기 시간을 늘려 준다)
-    const msg = await client.messages.create({
-      model: MODEL,
-      max_tokens: 8000,
-      system: SYSTEM_PROMPT,
-      thinking: { type: "adaptive" },
-      output_config: { effort: "high" },
-      tools: [{
-        type: "web_search_20260209",
-        name: "web_search",
-        max_uses: MAX_WEB_SEARCHES,
-        user_location: { type: "approximate", country: "KR", timezone: "Asia/Seoul" },
-      }],
-      messages: [{ role: "user", content: userPrompt }],
-    });
-
-    if (msg.stop_reason === "refusal") {
-      return json({ error: "AI 가 이 내용의 분석을 거절했습니다." }, 422);
-    }
-    const result = msg.content
-      .filter((b) => b.type === "text")
-      .map((b) => (b as { text: string }).text)
-      .join("\n")
-      .trim();
-    if (!result) return json({ error: "AI 가 빈 답을 돌려줬습니다. 다시 시도해 주세요." }, 502);
-
-    const usage = msg.usage as {
-      input_tokens?: number; output_tokens?: number;
-      server_tool_use?: { web_search_requests?: number };
-    };
-    const inputTokens = usage.input_tokens ?? 0;
-    const outputTokens = usage.output_tokens ?? 0;
-    const searches = usage.server_tool_use?.web_search_requests ?? 0;
-    const truncated = msg.stop_reason === "max_tokens";
-
-    // 5) 저장 (같은 메모를 다시 분석하면 새 줄이 쌓인다 — 이전 결과도 남는다)
-    const row = {
-      memo_id: memoId,
-      user_id: user.id,
-      result: truncated ? result + "\n\n(답이 길어 여기서 잘렸습니다)" : result,
-      model: msg.model,
-      input_tokens: inputTokens,
-      output_tokens: outputTokens,
-      web_searches: searches,
-      cost_krw: estimateCostKrw(inputTokens, outputTokens, searches),
-    };
-    const { data: saved, error: saveErr } = await supabase
-      .from("idea_analyses")
-      .insert(row)
-      .select("id,memo_id,result,model,cost_krw,created_at")
-      .single();
-    if (saveErr) {
-      // 저장에 실패해도 분석 결과는 이미 받았으니 돌려준다. 다만 실패를 숨기지 않는다.
-      console.error("분석 결과 저장 실패:", saveErr.message);
-      return json({ ok: true, analysis: { ...row, created_at: new Date().toISOString() }, saveError: saveErr.message });
-    }
-    return json({ ok: true, analysis: saved });
-  } catch (e) {
-    // Anthropic 쪽 오류는 종류별로 사람이 읽을 수 있는 말로 바꾼다.
-    if (e instanceof Anthropic.AuthenticationError) {
-      return json({ error: "AI 열쇠(ANTHROPIC_API_KEY)가 잘못됐습니다. Secrets 를 확인해 주세요." }, 500);
-    }
-    if (e instanceof Anthropic.RateLimitError) {
-      return json({ error: "AI 서버가 지금 붐빕니다. 잠시 뒤 다시 해주세요." }, 503);
-    }
-    if (e instanceof Anthropic.APIError) {
-      const status = (e as { status?: number }).status ?? 0;
-      if (status === 400 && /credit|billing|balance/i.test(e.message)) {
-        return json({ error: "AI 사용 잔액이 부족합니다. Anthropic 콘솔에서 충전해 주세요." }, 402);
+    const { readable, writable } = new TransformStream<Uint8Array, Uint8Array>();
+    const writer = writable.getWriter();
+    const enc = new TextEncoder();
+    let clientGone = false;
+    const keepalive = setInterval(() => {
+      writer.write(enc.encode(" ")).catch((e) => {
+        if (!clientGone) console.warn("폰과의 연결이 끊긴 듯함 (분석은 계속해서 저장함):", e?.message ?? e);
+        clientGone = true;
+      });
+    }, 5000);
+    const finish = async (body: unknown) => {
+      clearInterval(keepalive);
+      try {
+        await writer.write(enc.encode(JSON.stringify(body)));
+        await writer.close();
+      } catch (e) {
+        console.error("응답을 쓰지 못함 (폰이 먼저 끊었을 수 있음):", e);
       }
-      return json({ error: `AI 서버 오류 (${status}): ${e.message}` }, 502);
-    }
+    };
+
+    (async () => {
+      try {
+        // 출력이 길어야 몇천 토큰이라 스트리밍 없이 한 번에 받는다.
+        // (SDK 가 max_tokens 크기에 맞춰 대기 시간을 늘려 준다)
+        const msg = await client.messages.create({
+          model: MODEL,
+          max_tokens: 8000,
+          system: SYSTEM_PROMPT,
+          thinking: { type: "adaptive" },
+          output_config: { effort: "high" },
+          tools: [{
+            type: "web_search_20260209",
+            name: "web_search",
+            max_uses: MAX_WEB_SEARCHES,
+            user_location: { type: "approximate", country: "KR", timezone: "Asia/Seoul" },
+          }],
+          messages: [{ role: "user", content: userPrompt }],
+        });
+
+        if (msg.stop_reason === "refusal") {
+          await finish({ ok: false, error: "AI 가 이 내용의 분석을 거절했습니다." });
+          return;
+        }
+        const result = msg.content
+          .filter((b) => b.type === "text")
+          .map((b) => (b as { text: string }).text)
+          .join("\n")
+          .trim();
+        if (!result) {
+          await finish({ ok: false, error: "AI 가 빈 답을 돌려줬습니다. 다시 시도해 주세요." });
+          return;
+        }
+
+        const usage = msg.usage as {
+          input_tokens?: number; output_tokens?: number;
+          server_tool_use?: { web_search_requests?: number };
+        };
+        const inputTokens = usage.input_tokens ?? 0;
+        const outputTokens = usage.output_tokens ?? 0;
+        const searches = usage.server_tool_use?.web_search_requests ?? 0;
+        const truncated = msg.stop_reason === "max_tokens";
+
+        // 5) 저장 (같은 메모를 다시 분석하면 새 줄이 쌓인다 — 이전 결과도 남는다)
+        //    폰과의 연결이 끊겼어도 여기까지 오면 저장된다. 폰은 표를 다시 읽어 결과를 찾는다.
+        const row = {
+          memo_id: memoId,
+          user_id: user.id,
+          result: truncated ? result + "\n\n(답이 길어 여기서 잘렸습니다)" : result,
+          model: msg.model,
+          input_tokens: inputTokens,
+          output_tokens: outputTokens,
+          web_searches: searches,
+          cost_krw: estimateCostKrw(inputTokens, outputTokens, searches),
+        };
+        const { data: saved, error: saveErr } = await supabase
+          .from("idea_analyses")
+          .insert(row)
+          .select("id,memo_id,result,model,cost_krw,created_at")
+          .single();
+        if (saveErr) {
+          // 저장에 실패해도 분석 결과는 이미 받았으니 돌려준다. 다만 실패를 숨기지 않는다.
+          console.error("분석 결과 저장 실패:", saveErr.message);
+          await finish({ ok: true, analysis: { ...row, created_at: new Date().toISOString() }, saveError: saveErr.message });
+          return;
+        }
+        await finish({ ok: true, analysis: saved });
+      } catch (e) {
+        await finish({ ok: false, error: describeAiError(e) });
+      }
+    })();
+
+    return new Response(readable, {
+      status: 200,
+      headers: { ...CORS, "Content-Type": "application/json; charset=utf-8", "X-Accel-Buffering": "no" },
+    });
+  } catch (e) {
     console.error("분석 함수 오류:", e);
     return json({ error: `서버 오류: ${(e as Error)?.message ?? e}` }, 500);
   }
 });
+
+// Anthropic 쪽 오류를 종류별로 사람이 읽을 수 있는 말로 바꾼다.
+function describeAiError(e: unknown): string {
+  if (e instanceof Anthropic.AuthenticationError) {
+    return "AI 열쇠(ANTHROPIC_API_KEY)가 잘못됐습니다. Secrets 를 확인해 주세요.";
+  }
+  if (e instanceof Anthropic.RateLimitError) {
+    return "AI 서버가 지금 붐빕니다. 잠시 뒤 다시 해주세요.";
+  }
+  if (e instanceof Anthropic.APIError) {
+    const status = (e as { status?: number }).status ?? 0;
+    if (status === 400 && /credit|billing|balance/i.test(e.message)) {
+      return "AI 사용 잔액이 부족합니다. Anthropic 콘솔에서 충전해 주세요.";
+    }
+    return `AI 서버 오류 (${status}): ${e.message}`;
+  }
+  console.error("분석 중 오류:", e);
+  return `분석 중 오류: ${(e as Error)?.message ?? e}`;
+}

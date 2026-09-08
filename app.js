@@ -19,7 +19,7 @@ function readConfig() {
   return null;
 }
 // 앱 버전 (배포할 때마다 올립니다 — 폰이 새 코드를 받았는지 확인용)
-const APP_VERSION = '1.16.1';
+const APP_VERSION = '1.16.2';
 
 const conf = readConfig();
 const configured = !!conf;
@@ -1000,7 +1000,9 @@ async function waitForAnalysisAfter(memoId, sinceIso, maxMs = 3 * 60 * 1000) {
 }
 
 function isConnectionDrop(e) {
-  return !!e && (e.name === 'FunctionsFetchError' || /연결하지 못했|Failed to fetch|NetworkError|Load failed/i.test(e.message || ''));
+  // "Unexpected end of JSON input" 은 서버가 답을 다 쓰기 전에 끊긴 것 (시간 한도 등). 이것도 끊김으로 본다.
+  return !!e && (e.name === 'FunctionsFetchError' || e.name === 'SyntaxError'
+    || /연결하지 못했|Failed to fetch|NetworkError|Load failed|JSON input|Unexpected end/i.test(e.message || ''));
 }
 
 async function runAnalysis() {
@@ -1050,7 +1052,7 @@ async function runAnalysis() {
       }
       syncFlash('⚠️ 분석 실패', 3000);
       if (current && current.id === memoId) {
-        renderAnalysis(null, { error: '결과가 오지 않았어요. 잠시 뒤 이 메모를 다시 열어 보세요. 서버가 끝냈으면 그때 보입니다.\n(계속 안 되면: ' + (e.message || e) + ')' });
+        renderAnalysis(null, { error: '서버가 시간 안에 분석을 끝내지 못했어요. 한 번 더 눌러 보세요.\n(계속 안 되면 이 문구를 알려주세요: ' + (e.message || e) + ')' });
       }
       return;
     }

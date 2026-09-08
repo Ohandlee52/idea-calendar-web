@@ -19,7 +19,7 @@ function readConfig() {
   return null;
 }
 // 앱 버전 (배포할 때마다 올립니다 — 폰이 새 코드를 받았는지 확인용)
-const APP_VERSION = '1.15.0';
+const APP_VERSION = '1.15.1';
 
 const conf = readConfig();
 const configured = !!conf;
@@ -913,7 +913,7 @@ function renderAnalysis(a, opts = {}) {
   if (opts.loading) {
     const p = document.createElement('div');
     p.className = 'ai-meta';
-    p.textContent = '분석 중… 30초~1분쯤 걸려요. 이 화면을 그대로 두세요.';
+    p.textContent = opts.text || '분석 중… 30초~2분쯤 걸려요. 이 화면을 그대로 두세요.';
     aiRow.appendChild(p);
     return;
   }
@@ -969,6 +969,28 @@ async function describeFnError(error) {
   return new Error((error && error.message) || String(error));
 }
 
+// 연결이 끊겨도 서버는 분석을 마치고 표에 저장한다. 그 결과가 나타날 때까지 몇 초마다 표를 다시 읽는다.
+async function waitForAnalysisAfter(memoId, sinceIso, maxMs = 3 * 60 * 1000) {
+  const t0 = Date.now();
+  while (Date.now() - t0 < maxMs) {
+    await new Promise((r) => setTimeout(r, 8000));
+    if (!current || current.id !== memoId) return null;     // 다른 메모로 옮겼으면 그만둔다
+    const { data, error } = await sb.from('idea_analyses')
+      .select('result,created_at,cost_krw,model')
+      .eq('memo_id', memoId)
+      .gt('created_at', sinceIso)
+      .order('created_at', { ascending: false })
+      .limit(1);
+    if (error) { console.error('결과 확인 실패:', error); continue; }
+    if (data && data[0]) return data[0];
+  }
+  return null;
+}
+
+function isConnectionDrop(e) {
+  return !!e && (e.name === 'FunctionsFetchError' || /연결하지 못했|Failed to fetch|NetworkError|Load failed/i.test(e.message || ''));
+}
+
 async function runAnalysis() {
   if (!current || aiBusy) return;
   await commitCurrent();                       // 먼저 저장한다 (새 메모면 여기서 서버에 생긴다)
@@ -984,6 +1006,8 @@ async function runAnalysis() {
   renderAnalysis(null, { loading: true });
   syncBusy('AI 분석 중…');
   const memoId = current.id;
+  // 시계가 조금 어긋나도 놓치지 않게 1분 앞선 시각부터 "새 결과"로 본다
+  const sinceIso = new Date(Date.now() - 60 * 1000).toISOString();
   try {
     const { data, error } = await sb.functions.invoke('analyze-idea', { body: { memoId } });
     if (error) throw await describeFnError(error);
@@ -992,6 +1016,23 @@ async function runAnalysis() {
     syncFlash('분석 완료 ✓');
   } catch (e) {
     console.error('AI 분석 실패:', e);
+    if (isConnectionDrop(e)) {
+      // 연결만 끊긴 것일 수 있다. 서버는 계속 분석해서 표에 저장하므로 기다려 본다.
+      if (current && current.id === memoId) {
+        renderAnalysis(null, { loading: true, text: '연결이 잠깐 끊겼지만 서버가 계속 분석 중일 수 있어요. 결과를 기다리는 중… (최대 3분)' });
+      }
+      const found = await waitForAnalysisAfter(memoId, sinceIso);
+      if (found) {
+        if (current && current.id === memoId) renderAnalysis(found);
+        syncFlash('분석 완료 ✓');
+        return;
+      }
+      syncFlash('⚠️ 분석 실패', 3000);
+      if (current && current.id === memoId) {
+        renderAnalysis(null, { error: '결과가 오지 않았어요. 잠시 뒤 이 메모를 다시 열어 보세요. 서버가 끝냈으면 그때 보입니다.\n(계속 안 되면: ' + (e.message || e) + ')' });
+      }
+      return;
+    }
     syncFlash('⚠️ 분석 실패', 3000);
     if (current && current.id === memoId) renderAnalysis(null, { error: e.message || String(e) });
   } finally {

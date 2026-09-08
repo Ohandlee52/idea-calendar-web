@@ -19,7 +19,7 @@ function readConfig() {
   return null;
 }
 // 앱 버전 (배포할 때마다 올립니다 — 폰이 새 코드를 받았는지 확인용)
-const APP_VERSION = '1.10.0';
+const APP_VERSION = '1.11.0';
 
 const conf = readConfig();
 const configured = !!conf;
@@ -946,7 +946,85 @@ $('menuBtn').addEventListener('click', () => {
   $('sheetTitle').textContent = `메뉴 · v${APP_VERSION}`;
   sheet.classList.remove('hidden');
   $('menuImport').hidden = !user || user.id !== OWNER_ID;
+  refreshInstallItem();
   refreshLinkItems();
+});
+
+// ── 📲 폰 바탕화면에 바로가기 만들기 ──
+// 안드로이드 크롬은 브라우저가 "설치할 수 있다"고 알려줄 때 그 기회를 잡아 두었다가
+// 사용자가 누르는 순간 설치창을 띄운다. 아이폰(사파리)은 그런 방법이 없어서
+// 직접 누르실 곳을 글로 안내한다.
+let installPrompt = null;
+
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();          // 브라우저가 제멋대로 띄우지 못하게 막고
+  installPrompt = e;           // 메뉴에서 누를 때 쓰려고 들고 있는다
+  refreshInstallItem();
+});
+
+// 설치가 끝나면 안내가 더는 필요 없다
+window.addEventListener('appinstalled', () => {
+  installPrompt = null;
+  refreshInstallItem();
+});
+
+function isStandalone() {
+  return window.matchMedia('(display-mode: standalone)').matches
+      || window.navigator.standalone === true;   // 아이폰은 이 값으로 알려준다
+}
+
+function isIOS() {
+  return /iPad|iPhone|iPod/.test(navigator.userAgent)
+      || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+}
+
+function refreshInstallItem() {
+  const btn = $('menuInstall');
+  if (isStandalone()) {
+    btn.textContent = '✅ 바탕화면에 이미 있어요';
+    btn.disabled = true;
+  } else {
+    btn.textContent = '📲 폰 바탕화면에 바로가기 만들기';
+    btn.disabled = false;
+  }
+}
+
+$('menuInstall').addEventListener('click', async () => {
+  // ① 안드로이드 크롬 — 설치창을 바로 띄운다
+  if (installPrompt) {
+    sheet.classList.add('hidden');
+    installPrompt.prompt();
+    const { outcome } = await installPrompt.userChoice;
+    installPrompt = null;                 // 한 번 쓰면 다시 못 쓴다
+    if (outcome === 'accepted') {
+      alert(`바탕화면에 만들었어요.
+이제 그 아이콘으로 바로 열 수 있습니다.`);
+    }
+    refreshInstallItem();
+    return;
+  }
+
+  // ② 아이폰 — 직접 누르실 곳을 안내한다 (다른 방법이 없다)
+  sheet.classList.add('hidden');
+  if (isIOS()) {
+    alert(`아이폰에서 만드는 법
+
+1. 화면 아래 [공유] 단추(↑ 모양)를 누르세요
+2. 목록을 내려서 [홈 화면에 추가]를 누르세요
+3. 오른쪽 위 [추가]를 누르면 끝입니다
+
+※ 사파리에서만 됩니다. 크롬으로 여셨다면 사파리로 다시 열어주세요.`);
+    return;
+  }
+
+  // ③ 그 밖 — 브라우저 메뉴로 안내
+  alert(`브라우저 메뉴에서 만드실 수 있어요.
+
+1. 오른쪽 위 [⋮] 단추를 누르세요
+2. [홈 화면에 추가] 또는 [앱 설치]를 누르세요
+
+※ 그 항목이 안 보이면 이미 만들어져 있거나,
+   이 브라우저가 지원하지 않는 것입니다.`);
 });
 
 // ── 바깥 계정 연결 (구글·카카오) ──

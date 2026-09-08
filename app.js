@@ -1144,11 +1144,32 @@ function isIOS() {
       || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 }
 
+// 카톡·네이버·인스타 같은 앱 "안"의 브라우저인가.
+// 이런 브라우저는 홈 화면 설치 기능 자체가 없어서 안내문밖에 못 띄운다.
+// (카톡으로 받은 링크를 누르면 여기로 열린다 — 실제로 그렇게 됐다)
+function isInAppBrowser(ua = navigator.userAgent) {
+  // "; wv)" 는 안드로이드가 앱 안 브라우저(WebView)에 붙이는 표시다.
+  return /KAKAOTALK|NAVER\(inapp|Instagram|FBAN|FBAV|FB_IAB|Line\/|DaumApps|; wv\)/i.test(ua);
+}
+function isAndroid(ua = navigator.userAgent) { return /Android/i.test(ua); }
+
+// 안드로이드에서 "이 주소를 크롬으로 열어라"는 특별한 주소.
+// 크롬이 없으면 fallback 주소로 그냥 연다.
+function chromeIntentUrl(href = location.href) {
+  const u = new URL(href);
+  return 'intent://' + u.host + u.pathname + u.search
+    + '#Intent;scheme=https;package=com.android.chrome;S.browser_fallback_url='
+    + encodeURIComponent(u.origin + u.pathname + u.search) + ';end';
+}
+
 function refreshInstallItem() {
   const btn = $('menuInstall');
   if (isStandalone()) {
     btn.textContent = '✅ 바탕화면에 이미 있어요';
     btn.disabled = true;
+  } else if (isInAppBrowser() && isAndroid()) {
+    btn.textContent = '📲 크롬으로 열어서 바로가기 만들기';
+    btn.disabled = false;
   } else {
     btn.textContent = '📲 폰 바탕화면에 바로가기 만들기';
     btn.disabled = false;
@@ -1156,6 +1177,29 @@ function refreshInstallItem() {
 }
 
 $('menuInstall').addEventListener('click', async () => {
+  // ⓪ 카톡 등 앱 안의 브라우저 — 여기서는 만들 수 없으니 크롬으로 넘긴다
+  if (isInAppBrowser() && !isStandalone()) {
+    sheet.classList.add('hidden');
+    if (isAndroid()) {
+      alert(`지금은 카톡(또는 다른 앱) 안의 브라우저라서
+바로가기를 만들 수 없어요.
+
+[확인]을 누르면 크롬으로 다시 열립니다.
+크롬에서 메뉴 → "폰 바탕화면에 바로가기 만들기"를
+한 번 더 눌러 주세요.`);
+      location.href = chromeIntentUrl();
+      return;
+    }
+    alert(`지금은 카톡(또는 다른 앱) 안의 브라우저라서
+바로가기를 만들 수 없어요.
+
+1. 화면 아래(또는 위) [⋯] 단추를 누르세요
+2. [Safari로 열기]를 누르세요
+3. 사파리에서 메뉴 → "폰 바탕화면에 바로가기 만들기"를
+   한 번 더 눌러 주세요.`);
+    return;
+  }
+
   // ① 안드로이드 크롬 — 설치창을 바로 띄운다
   if (installPrompt) {
     sheet.classList.add('hidden');

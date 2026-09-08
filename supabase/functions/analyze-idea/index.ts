@@ -69,8 +69,17 @@ Deno.serve(async (req: Request) => {
     if (!authHeader.startsWith("Bearer ")) return json({ error: "로그인이 필요합니다" }, 401);
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL");
-    const anonKey = Deno.env.get("SUPABASE_ANON_KEY");
-    if (!supabaseUrl || !anonKey) return json({ error: "서버 설정(SUPABASE_URL/ANON_KEY)이 없습니다" }, 500);
+    // 공개 키: 옛 이름(SUPABASE_ANON_KEY)이 없으면 새 방식(SUPABASE_PUBLISHABLE_KEYS, JSON 묶음)에서 꺼낸다.
+    let anonKey = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
+    if (!anonKey) {
+      try {
+        const dict = JSON.parse(Deno.env.get("SUPABASE_PUBLISHABLE_KEYS") ?? "{}");
+        anonKey = String(Object.values(dict)[0] ?? "");
+      } catch (e) {
+        console.error("SUPABASE_PUBLISHABLE_KEYS 를 읽지 못함:", e);
+      }
+    }
+    if (!supabaseUrl || !anonKey) return json({ error: "서버 설정(SUPABASE_URL / 공개 키)이 없습니다" }, 500);
 
     // 사용자 토큰을 그대로 넘겨서, 표를 읽고 쓸 때 RLS(내 것만) 규칙이 그대로 적용되게 한다.
     const supabase = createClient(supabaseUrl, anonKey, {

@@ -19,7 +19,7 @@
   <meta name="twitter:card" content="summary" />
 
   <link rel="manifest" href="manifest.json" />
-  <link rel="stylesheet" href="app.css?v=1.16.2" />
+  <link rel="stylesheet" href="app.css?v=1.17.0" />
 </head>
 <body>
 
@@ -200,6 +200,22 @@
     </div>
   </section>
 
+  <!-- ───── AI 기간 총평 화면 (전체 화면) ───── -->
+  <section id="periodView" class="edit-view hidden">
+    <header class="top-bar">
+      <button id="periodBack" class="icon-btn">‹ 뒤로</button>
+      <div id="periodTitle" class="top-title">AI 총평</div>
+      <span class="icon-btn" aria-hidden="true"></span>
+    </header>
+    <div class="edit-body">
+      <div id="periodRange" class="ai-meta"></div>
+      <div id="periodRow" class="ai-row"></div>
+      <div class="edit-controls">
+        <button id="periodAgain" class="chip-btn">🤖 다시 분석</button>
+      </div>
+    </div>
+  </section>
+
   <!-- ───── 메뉴 (아래에서 올라옴) ───── -->
   <div id="sheet" class="sheet hidden">
     <div class="sheet-box">
@@ -247,15 +263,17 @@
       <p id="rangeInfo" class="range-info"></p>
 
       <button id="rangeGo" class="primary-btn big">이 기간 모아보기</button>
+      <!-- 기간 전체를 AI 가 읽고 반복 주제·밀고 갈 것을 짚어 준다 (서버 함수, 비용 듦) -->
+      <button id="rangeAi" class="chip-btn big-chip">🤖 이 기간 AI 총평</button>
       <button id="rangeClose" class="sheet-item cancel">닫기</button>
     </div>
   </div>
 
   <!-- Supabase 라이브러리 (최신 2.x — 새 형식의 publishable 키도 지원) -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-  <script src="config.js?v=1.16.2"></script>
-  <script src="logic.js?v=1.16.2"></script>
-  <script src="holidays.js?v=1.16.2"></script>
-  <script src="app.js?v=1.16.2"></script>
+  <script src="config.js?v=1.17.0"></script>
+  <script src="logic.js?v=1.17.0"></script>
+  <script src="holidays.js?v=1.17.0"></script>
+  <script src="app.js?v=1.17.0"></script>
 </body>
 </html>

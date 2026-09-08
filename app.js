@@ -19,7 +19,7 @@ function readConfig() {
   return null;
 }
 // 앱 버전 (배포할 때마다 올립니다 — 폰이 새 코드를 받았는지 확인용)
-const APP_VERSION = '1.16.2';
+const APP_VERSION = '1.17.0';
 
 const conf = readConfig();
 const configured = !!conf;
@@ -944,6 +944,17 @@ function renderAnalysis(a, opts = {}) {
   m.className = 'ai-meta';
   m.textContent = `${fmtDateTime(a.created_at)} · 약 ${a.cost_krw != null ? a.cost_krw : '?'}원`;
   aiRow.appendChild(m);
+  aiRow.appendChild(makeAiNote(a.saveError));
+}
+
+// AI 결과 아래 고정 안내문. 분석이 스스로 짚은 "과신 위험"을 화면에서 막는다.
+const AI_NOTE = 'AI 웹 검색 결과는 참고용입니다. 특허·상표·비공개 서비스는 확인되지 않습니다.';
+function makeAiNote(extra) {
+  const n = document.createElement('div');
+  n.className = 'ai-note';
+  n.textContent = extra ? `${AI_NOTE}\n⚠️ ${extra}` : AI_NOTE;
+  n.style.whiteSpace = 'pre-wrap';
+  return n;
 }
 
 // 이 메모의 가장 최근 분석 결과를 표에서 가져온다 (없으면 칸을 숨긴다)
@@ -1035,7 +1046,7 @@ async function runAnalysis() {
     const { data, error } = await sb.functions.invoke('analyze-idea', { body: { memoId } });
     if (error) throw await describeFnError(error);
     if (!data || !data.ok || !data.analysis) throw new Error((data && data.error) || '서버가 알 수 없는 답을 보냈어요');
-    if (current && current.id === memoId) renderAnalysis(data.analysis);
+    if (current && current.id === memoId) renderAnalysis({ ...data.analysis, saveError: data.saveError });
     syncFlash('분석 완료 ✓');
   } catch (e) {
     console.error('AI 분석 실패:', e);
@@ -1731,6 +1742,119 @@ $('rangeGo').addEventListener('click', () => {
   rangeSheet.classList.add('hidden');
   openReport(rangeFrom.value, rangeTo.value);
 });
+
+// ── AI 기간 총평 ──
+// 기간 안의 메모 전체를 서버 함수가 AI 에게 넘겨 반복 주제·밀고 갈 것·보류할 것을 짚는다.
+// 웹 검색은 안 쓰므로 메모 분석보다 싸다 (메모 100개에 50원 안팎).
+const periodView = $('periodView'), periodRow = $('periodRow');
+let periodBusy = false;
+let periodCur = null;            // 지금 보고 있는 기간 { from, to }
+
+function periodLabel(from, to) { return `${from} ~ ${to}`; }
+
+function renderPeriod(a, opts = {}) {
+  periodRow.innerHTML = '';
+  const head = document.createElement('div');
+  head.className = 'ai-head';
+  head.textContent = '🤖 이 기간 AI 총평';
+  periodRow.appendChild(head);
+  if (opts.loading) {
+    const wait = document.createElement('div');
+    wait.className = 'ai-wait';
+    const spin = document.createElement('span'); spin.className = 'ai-spin'; spin.textContent = '⏳';
+    const txt = document.createElement('div');
+    const p = document.createElement('div'); p.textContent = opts.text || '메모를 모두 읽고 정리하는 중… 30초~1분쯤 걸려요.';
+    const el = document.createElement('div'); el.className = 'ai-elapsed'; el.id = 'periodElapsed'; el.textContent = '0초 지남';
+    txt.appendChild(p); txt.appendChild(el); wait.appendChild(spin); wait.appendChild(txt);
+    periodRow.appendChild(wait);
+    return;
+  }
+  if (opts.error) {
+    const p = document.createElement('div'); p.className = 'ai-err'; p.textContent = '⚠️ ' + opts.error;
+    periodRow.appendChild(p);
+    return;
+  }
+  if (!a) {
+    const p = document.createElement('div'); p.className = 'ai-meta';
+    p.textContent = '아직 이 기간의 총평이 없어요. 아래 [다시 분석]을 누르면 만들어요.';
+    periodRow.appendChild(p);
+    return;
+  }
+  const t = document.createElement('div'); t.className = 'ai-text'; t.textContent = a.result || '';
+  periodRow.appendChild(t);
+  const m = document.createElement('div'); m.className = 'ai-meta';
+  m.textContent = `${fmtDateTime(a.created_at)} · 약 ${a.cost_krw != null ? a.cost_krw : '?'}원`;
+  periodRow.appendChild(m);
+  periodRow.appendChild(makeAiNote(a.saveError));
+}
+
+function openPeriodView(from, to) {
+  periodCur = { from, to };
+  $('periodTitle').textContent = 'AI 총평';
+  $('periodRange').textContent = `${periodLabel(from, to)} · 메모 ${Logic.memosInRange(allMemos, from, to).length}개`;
+  mainView.classList.add('hidden');            // 편집 화면과 같은 방식: 달력 화면을 숨기고 이 화면만 보인다
+  periodView.classList.remove('hidden');
+  window.scrollTo(0, 0);
+}
+$('periodBack').addEventListener('click', () => { periodView.classList.add('hidden'); mainView.classList.remove('hidden'); periodCur = null; });
+
+// 이 기간의 가장 최근 총평을 표에서 가져온다 (SQL 10번 전에는 kind 칸이 없어 실패 → 없음으로 본다)
+async function loadPeriodAnalysis(from, to) {
+  const { data, error } = await sb.from('idea_analyses')
+    .select('result,created_at,cost_krw,model')
+    .eq('kind', 'period').eq('period_from', from).eq('period_to', to)
+    .order('created_at', { ascending: false })
+    .limit(1);
+  if (error) { console.warn('기간 총평 불러오기 실패 (SQL 10번 미실행일 수 있음):', error.message); return null; }
+  return data && data[0] ? data[0] : null;
+}
+
+async function runPeriodAnalysis(from, to) {
+  if (periodBusy) return;
+  const n = Logic.memosInRange(allMemos, from, to).length;
+  if (n === 0) { alert('이 기간에는 메모가 없어요.'); return; }
+  if (!confirm(`${periodLabel(from, to)} 메모 ${n}개를 AI 가 읽고 총평을 만듭니다.\n비용이 듭니다 (약 50~150원). 30초~1분쯤 걸려요. 진행할까요?`)) return;
+
+  periodBusy = true;
+  const btn = $('periodAgain');
+  btn.disabled = true; btn.textContent = '분석 중…';
+  openPeriodView(from, to);
+  renderPeriod(null, { loading: true });
+  const startedAt = Date.now();
+  const timer = setInterval(() => {
+    const el = document.getElementById('periodElapsed');
+    if (el) el.textContent = `${Math.round((Date.now() - startedAt) / 1000)}초 지남`;
+  }, 1000);
+  try {
+    const { data, error } = await sb.functions.invoke('analyze-idea', { body: { period: { from, to } } });
+    if (error) throw await describeFnError(error);
+    if (!data || !data.ok || !data.analysis) throw new Error((data && data.error) || '서버가 알 수 없는 답을 보냈어요');
+    if (periodCur && periodCur.from === from && periodCur.to === to) renderPeriod({ ...data.analysis, saveError: data.saveError });
+    syncFlash('총평 완료 ✓');
+  } catch (e) {
+    console.error('기간 총평 실패:', e);
+    syncFlash('⚠️ 총평 실패', 3000);
+    const msg = isConnectionDrop(e)
+      ? '서버가 시간 안에 끝내지 못했어요. 기간을 조금 줄이거나 한 번 더 눌러 보세요.'
+      : (e.message || String(e));
+    if (periodCur && periodCur.from === from && periodCur.to === to) renderPeriod(null, { error: msg });
+  } finally {
+    clearInterval(timer);
+    periodBusy = false;
+    btn.disabled = false; btn.textContent = '🤖 다시 분석';
+  }
+}
+
+// 기간 고르기 창의 [이 기간 AI 총평]: 저장된 총평이 있으면 먼저 보여주고, 없으면 바로 만든다
+$('rangeAi').addEventListener('click', async () => {
+  const from = rangeFrom.value, to = rangeTo.value;
+  if (!from || !to || from > to) { alert('시작과 끝 날짜를 먼저 골라 주세요.'); return; }
+  rangeSheet.classList.add('hidden');
+  const saved = await loadPeriodAnalysis(from, to);
+  if (saved) { openPeriodView(from, to); renderPeriod(saved); return; }
+  await runPeriodAnalysis(from, to);
+});
+$('periodAgain').addEventListener('click', () => { if (periodCur) runPeriodAnalysis(periodCur.from, periodCur.to); });
 
 function openReport(first, last) {
   const list = Logic.memosInRange(allMemos, first, last);

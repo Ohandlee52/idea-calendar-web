@@ -19,7 +19,7 @@ function readConfig() {
   return null;
 }
 // 앱 버전 (배포할 때마다 올립니다 — 폰이 새 코드를 받았는지 확인용)
-const APP_VERSION = '1.14.0';
+const APP_VERSION = '1.15.0';
 
 const conf = readConfig();
 const configured = !!conf;
@@ -571,6 +571,7 @@ function openMemo(memo) {
   titleInput.value = memo.title;
   bodyInput.value = memo.body;
   renderImageRow();
+  loadAnalysis();
   tagsInput.value = memo.tags.join(', ');
   editDate.textContent = memo.date;
   editMeta.textContent = `수정 ${fmtDateTime(memo.updatedAt)}`;
@@ -590,6 +591,7 @@ function newMemo() {
   loadedBody = '';
   titleInput.value = ''; bodyInput.value = ''; tagsInput.value = '';
   renderImageRow();
+  renderAnalysis(null);
   editDate.textContent = selectedKey;
   editMeta.textContent = '새 메모';
   refreshEditControls();
@@ -892,6 +894,112 @@ async function removePhoto(src) {
   renderImageRow();
   await commitCurrent();
 }
+
+// ── AI 분석 ──
+// 서버 함수(analyze-idea)가 메모를 Claude 에게 넘겨 분석하고 idea_analyses 표에 저장한다.
+// 앱은 열쇠를 갖고 있지 않다. 서버만 갖고 있다.
+// 비용이 드는 일이라 누르면 한 번 묻고, 결과는 저장돼 있어 다시 볼 때는 공짜다.
+const aiRow = $('aiRow');
+let aiBusy = false;
+
+function renderAnalysis(a, opts = {}) {
+  aiRow.innerHTML = '';
+  if (!a && !opts.loading && !opts.error) { aiRow.classList.add('hidden'); return; }
+  aiRow.classList.remove('hidden');
+  const head = document.createElement('div');
+  head.className = 'ai-head';
+  head.textContent = '🤖 AI 분석';
+  aiRow.appendChild(head);
+  if (opts.loading) {
+    const p = document.createElement('div');
+    p.className = 'ai-meta';
+    p.textContent = '분석 중… 30초~1분쯤 걸려요. 이 화면을 그대로 두세요.';
+    aiRow.appendChild(p);
+    return;
+  }
+  if (opts.error) {
+    const p = document.createElement('div');
+    p.className = 'ai-err';
+    p.textContent = '⚠️ ' + opts.error;
+    aiRow.appendChild(p);
+    return;
+  }
+  const t = document.createElement('div');
+  t.className = 'ai-text';
+  t.textContent = a.result || '';
+  aiRow.appendChild(t);
+  const m = document.createElement('div');
+  m.className = 'ai-meta';
+  m.textContent = `${fmtDateTime(a.created_at)} · 약 ${a.cost_krw != null ? a.cost_krw : '?'}원`;
+  aiRow.appendChild(m);
+}
+
+// 이 메모의 가장 최근 분석 결과를 표에서 가져온다 (없으면 칸을 숨긴다)
+async function loadAnalysis() {
+  if (!current || currentIsNew) { renderAnalysis(null); return; }
+  const memoId = current.id;
+  const { data, error } = await sb.from('idea_analyses')
+    .select('result,created_at,cost_krw,model')
+    .eq('memo_id', memoId)
+    .order('created_at', { ascending: false })
+    .limit(1);
+  if (!current || current.id !== memoId) return;      // 그 사이 다른 메모를 열었으면 무시
+  if (error) {
+    console.error('분석 결과 불러오기 실패:', error);
+    // 표가 아직 없을 때(SQL 9번 미실행)도 여기로 온다. 메모 보는 데는 지장이 없으니 칸만 숨긴다.
+    renderAnalysis(null);
+    return;
+  }
+  renderAnalysis(data && data[0] ? data[0] : null);
+}
+
+// 서버 함수가 보낸 오류 문구를 꺼낸다 (supabase-js 는 본문을 error.context 에 넣어 준다)
+async function describeFnError(error) {
+  try {
+    if (error && error.context && typeof error.context.json === 'function') {
+      const j = await error.context.json();
+      if (j && j.error) return new Error(j.error);
+    }
+  } catch (e) {
+    console.warn('오류 본문을 읽지 못함:', e);
+  }
+  if (error && error.name === 'FunctionsFetchError') {
+    return new Error('서버에 연결하지 못했어요. 인터넷을 확인해 주세요.\n(서버 함수 analyze-idea 가 아직 배포되지 않았을 수도 있어요)');
+  }
+  return new Error((error && error.message) || String(error));
+}
+
+async function runAnalysis() {
+  if (!current || aiBusy) return;
+  await commitCurrent();                       // 먼저 저장한다 (새 메모면 여기서 서버에 생긴다)
+  if (currentIsNew) { alert('먼저 제목이나 내용을 적어 주세요.'); return; }
+  if ((titleInput.value + bodyInput.value).trim().length < 5) {
+    alert('분석할 내용이 너무 짧아요. 제목이나 본문을 조금 더 적어 주세요.');
+    return;
+  }
+  if (!confirm('AI 분석에는 비용이 듭니다 (한 번에 약 50~150원).\n30초~1분쯤 걸려요. 진행할까요?')) return;
+
+  aiBusy = true;
+  $('aiBtn').disabled = true;
+  renderAnalysis(null, { loading: true });
+  syncBusy('AI 분석 중…');
+  const memoId = current.id;
+  try {
+    const { data, error } = await sb.functions.invoke('analyze-idea', { body: { memoId } });
+    if (error) throw await describeFnError(error);
+    if (!data || !data.ok || !data.analysis) throw new Error((data && data.error) || '서버가 알 수 없는 답을 보냈어요');
+    if (current && current.id === memoId) renderAnalysis(data.analysis);
+    syncFlash('분석 완료 ✓');
+  } catch (e) {
+    console.error('AI 분석 실패:', e);
+    syncFlash('⚠️ 분석 실패', 3000);
+    if (current && current.id === memoId) renderAnalysis(null, { error: e.message || String(e) });
+  } finally {
+    aiBusy = false;
+    $('aiBtn').disabled = false;
+  }
+}
+$('aiBtn').addEventListener('click', runAnalysis);
 
 $('photoBtn').addEventListener('click', () => $('photoInput').click());
 $('photoInput').addEventListener('change', async (e) => {

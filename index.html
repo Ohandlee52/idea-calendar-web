@@ -19,7 +19,7 @@
   <meta name="twitter:card" content="summary" />
 
   <link rel="manifest" href="manifest.json" />
-  <link rel="stylesheet" href="app.css?v=1.14.0" />
+  <link rel="stylesheet" href="app.css?v=1.15.0" />
 </head>
 <body>
 
@@ -180,6 +180,8 @@
       <textarea id="memoBody" class="edit-content" placeholder="내용을 입력하세요..."></textarea>
       <!-- 붙인 사진을 여기에 보여줍니다 (폰·PC 어디서 붙였든) -->
       <div id="imageRow" class="image-row hidden"></div>
+      <!-- AI 분석 결과 (있을 때만 보임) -->
+      <div id="aiRow" class="ai-row hidden"></div>
       <div id="linkRow" class="link-row"></div>
       <input id="memoTags" class="edit-tags" type="text"
              placeholder="태그 (쉼표로 구분: 아이디어, 할일)" />
@@ -190,6 +192,8 @@
         <!-- 사진 붙이기. 안 누르면 아무것도 안 바뀝니다 (메모 쓰는 단계 수는 그대로) -->
         <button id="photoBtn" class="chip-btn">📷 사진</button>
         <input id="photoInput" type="file" accept="image/*" hidden />
+        <!-- AI 분석. 서버 함수(analyze-idea)를 부른다. 비용이 들어 누르면 한 번 묻는다 -->
+        <button id="aiBtn" class="chip-btn">🤖 AI 분석</button>
       </div>
       <div id="reminderRows" class="reminder-rows"></div>
       <div id="editMeta" class="edit-meta"></div>
@@ -249,9 +253,9 @@
 
   <!-- Supabase 라이브러리 (최신 2.x — 새 형식의 publishable 키도 지원) -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-  <script src="config.js?v=1.14.0"></script>
-  <script src="logic.js?v=1.14.0"></script>
-  <script src="holidays.js?v=1.14.0"></script>
-  <script src="app.js?v=1.14.0"></script>
+  <script src="config.js?v=1.15.0"></script>
+  <script src="logic.js?v=1.15.0"></script>
+  <script src="holidays.js?v=1.15.0"></script>
+  <script src="app.js?v=1.15.0"></script>
 </body>
 </html>

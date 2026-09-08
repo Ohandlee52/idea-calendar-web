@@ -622,6 +622,20 @@ body {
   cursor: zoom-in;
   display: block;
 }
+/* AI 분석 결과 칸 */
+.ai-row {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 12px;
+  display: flex; flex-direction: column; gap: 8px;
+}
+.ai-row.hidden { display: none; }
+.ai-head { font-size: 13px; font-weight: 700; color: var(--text-soft); }
+.ai-text { white-space: pre-wrap; font-size: 14px; line-height: 1.55; word-break: break-word; }
+.ai-meta { font-size: 12px; color: var(--text-soft); }
+.ai-err  { font-size: 13px; color: var(--danger); white-space: pre-wrap; }
+
 .ir-box { position: relative; }
 .ir-del {
   position: absolute; top: 6px; right: 6px;

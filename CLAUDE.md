@@ -136,6 +136,11 @@ cd "C:\Users\PRO_UEFI\idea-calendar" && npm run make
 - Supabase 인증 서버는 트리거의 자세한 오류문구를 그대로 넘겨주지 않고
   `Database error saving new user` 로 뭉갠다. `translateAuthError` 에서 이를 번역한다.
 
+- **AI 분석은 서버 함수 `supabase/functions/analyze-idea/index.ts` 가 한다.** 결과 표는 `idea_analyses`
+  (`supabase-migration-9-ai-analyses.sql`). Anthropic 열쇠는 **Edge Functions → Secrets 의
+  `ANTHROPIC_API_KEY` 에만** 있다. 함수 배포도 대표님이 대시보드에서 하신다 (`배포방법.md` 참고).
+  로컬 시험은 `npx deno` + 가짜 Supabase/Anthropic 서버로 한다 (진짜 열쇠 없이).
+
 **SQL 파일은 대표님이 직접 SQL Editor에 붙여넣고 Run 하신다.** 내가 실행할 수 없다.
 파일을 만들고 → 무엇을 하는 SQL인지 설명하고 → 결과를 보여달라고 한다.
 

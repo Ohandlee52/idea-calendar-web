@@ -19,7 +19,7 @@ function readConfig() {
   return null;
 }
 // 앱 버전 (배포할 때마다 올립니다 — 폰이 새 코드를 받았는지 확인용)
-const APP_VERSION = '1.12.0';
+const APP_VERSION = '1.13.0';
 
 const conf = readConfig();
 const configured = !!conf;
@@ -1605,6 +1605,54 @@ $('setupSave').addEventListener('click', () => {
   location.reload();   // 새 정보로 다시 시작
 });
 
+// ── 새 판 알림 ──
+// 폰은 앱을 한 번 열어두면 며칠씩 그대로 두기 때문에, 새 판을 올려도 사용자는 모른다.
+// 그래서 앱으로 돌아올 때마다 서버의 index.html 을 새로 받아 판 번호를 견주고,
+// 다르면 위에 알림띠를 띄운다. 판 번호는 index.html 의 app.js?v=… 에 이미 있어
+// 따로 관리할 파일이 없다.
+let lastUpdateCheck = 0;
+const UPDATE_CHECK_GAP = 5 * 60 * 1000;   // 너무 자주 묻지 않게 5분 간격
+
+function versionFromHtml(html) {
+  const m = /app\.js\?v=([0-9.]+)/.exec(html || '');
+  return m ? m[1] : null;
+}
+
+function showUpdateBar(version) {
+  $('updateText').textContent = `새 버전(v${version})이 나왔어요`;
+  $('updateBar').classList.remove('hidden');
+}
+
+async function checkForUpdate(force) {
+  const now = Date.now();
+  if (!force && now - lastUpdateCheck < UPDATE_CHECK_GAP) return null;
+  lastUpdateCheck = now;
+  try {
+    const res = await fetch('index.html', { cache: 'reload' });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const latest = versionFromHtml(await res.text());
+    if (!latest) throw new Error('판 번호를 찾지 못함');
+    if (latest !== APP_VERSION) showUpdateBar(latest);
+    return latest;
+  } catch (e) {
+    // 인터넷이 없을 때도 여기로 온다. 알림띠는 안 띄우되 기록은 남긴다.
+    console.warn('새 판 확인 실패:', e.message || e);
+    return null;
+  }
+}
+
+$('updateGo').addEventListener('click', () => {
+  $('updateBar').classList.add('hidden');
+  location.reload();   // 파일 주소에 ?v= 가 붙어 있어 새로고침만으로 새 파일을 받는다
+});
+
+// 앱으로 돌아올 때(다른 앱 갔다 오기, 화면 켜기)와 30분마다 확인한다
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') checkForUpdate(false);
+});
+window.addEventListener('focus', () => checkForUpdate(false));
+setInterval(() => checkForUpdate(false), 30 * 60 * 1000);
+
 // ── 시작 ──
 (async function init() {
   // 서비스 워커 등록 (홈 화면 설치용)
@@ -1618,6 +1666,8 @@ $('setupSave').addEventListener('click', () => {
       });
     } catch { /* 무시 */ }
   }
+
+  setTimeout(() => checkForUpdate(true), 3000);   // 시작하고 3초 뒤 새 판 확인
 
   if (!configured) { openSetup(); return; }   // 아직 연결 정보가 없으면 설정부터
 

@@ -19,9 +19,15 @@
   <meta name="twitter:card" content="summary" />
 
   <link rel="manifest" href="manifest.json" />
-  <link rel="stylesheet" href="app.css?v=1.12.0" />
+  <link rel="stylesheet" href="app.css?v=1.13.0" />
 </head>
 <body>
+
+  <!-- 새 판이 나왔을 때 위에 뜨는 알림띠 (평소엔 숨김) -->
+  <div id="updateBar" class="update-bar hidden">
+    <span id="updateText">새 버전이 나왔어요</span>
+    <button id="updateGo" type="button">지금 업데이트</button>
+  </div>
 
   <!-- ───── 연결 설정 화면 (처음 한 번만) ───── -->
   <section id="setupView" class="login-view hidden">
@@ -243,9 +249,9 @@
 
   <!-- Supabase 라이브러리 (최신 2.x — 새 형식의 publishable 키도 지원) -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-  <script src="config.js?v=1.12.0"></script>
-  <script src="logic.js?v=1.12.0"></script>
-  <script src="holidays.js?v=1.12.0"></script>
-  <script src="app.js?v=1.12.0"></script>
+  <script src="config.js?v=1.13.0"></script>
+  <script src="logic.js?v=1.13.0"></script>
+  <script src="holidays.js?v=1.13.0"></script>
+  <script src="app.js?v=1.13.0"></script>
 </body>
 </html>

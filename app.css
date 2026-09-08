@@ -22,6 +22,22 @@
 }
 
 html, body { height: 100%; }
+
+/* 새 판 알림띠 — 화면 맨 위에 고정, 무엇보다 위에 뜬다 */
+.update-bar {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 60;
+  padding: calc(10px + var(--safe-top)) 14px 10px;
+  background: #1f2937; color: #fff;
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  font-size: 14px;
+  box-shadow: 0 2px 8px rgba(0,0,0,.25);
+}
+.update-bar.hidden { display: none; }
+.update-bar button {
+  border: none; border-radius: 999px; padding: 8px 14px;
+  background: var(--primary); color: #fff; font-size: 14px; font-weight: 700;
+  min-height: 40px; cursor: pointer; white-space: nowrap;
+}
 body {
   font-family: "Apple SD Gothic Neo", "맑은 고딕", "Malgun Gothic", system-ui, sans-serif;
   background: var(--bg);

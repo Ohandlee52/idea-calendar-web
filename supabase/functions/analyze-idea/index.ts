@@ -20,10 +20,11 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 // 1회 657원이 나왔다. Sonnet 5 + 검색 3번 + 짧은 답으로 약 100원 안팎을 목표로 한다.
 // 더 깊게 보고 싶으면 MODEL 을 "claude-opus-5" 로, 검색을 4~6으로 올리면 된다.
 const MODEL = "claude-sonnet-5";
-const EFFORT = "high";           // 생각 깊이: low / medium / high (medium 은 검색을 대충 써서 high 로 올림)
+// ⚠️ 시간 한도: Supabase 무료 등급은 함수 하나가 150초를 넘기면 끊는다. high + 검색 4번은 넘겼다 (실제로 끊김).
+const EFFORT = "medium";         // 생각 깊이: low / medium / high
 const MAX_TOKENS = 3000;         // 답 길이 상한
 const DAILY_LIMIT = 10;          // 한 사람이 하루에 돌릴 수 있는 횟수 (비용 보호)
-const MAX_WEB_SEARCHES = 4;      // 한 번 분석에 허용하는 웹 검색 횟수
+const MAX_WEB_SEARCHES = 3;      // 한 번 분석에 허용하는 웹 검색 횟수 (4번은 시간 한도에 걸림)
 const MIN_TEXT_LENGTH = 5;
 
 // 1회 비용 어림값 (원). 표시용이며 정확한 청구액은 Anthropic 콘솔이 기준이다.
@@ -43,7 +44,7 @@ const SYSTEM_PROMPT = `당신은 사업 아이디어를 냉정하게 검토해 �
 
 규칙:
 - 메모가 짧고 거칠어도 그 안의 핵심 의도를 먼저 한 줄로 요약한 뒤 분석합니다.
-- 웹 검색은 4번까지 됩니다. 순서를 지킵니다: 1번째·2번째 검색은 반드시 "같은 아이디어가 이미 있는지"(기존 제품·서비스·앱)를 찾는 데 씁니다. 한국어로 한 번, 영어로 한 번 검색합니다. 3·4번째만 시장·정책 확인에 씁니다.
+- 웹 검색은 3번까지 됩니다. 순서를 지킵니다: 1번째·2번째 검색은 반드시 "같은 아이디어가 이미 있는지"(기존 제품·서비스·앱)를 찾는 데 씁니다. 한국어로 한 번, 영어로 한 번 검색합니다. 3번째만 시장·정책 확인에 씁니다.
 - "이미 있는 것" 항목에는 검색에서 나온 가장 가까운 기존 제품·서비스를 2~3개, 각각 이름 + 무엇을 하는지 한 문장 + 출처(사이트 이름)로 적습니다. 이 항목이 이 분석의 핵심입니다.
 - 정확히 같은 것이 없으면 "똑같은 것은 없고, 가장 가까운 것은 ○○"라고 씁니다. 두 번 검색해도 관련 결과가 전혀 없을 때만 "찾지 못함"이라고 씁니다.
 - "직접 검색해 보세요", "별도 확인이 필요합니다" 같은 말은 쓰지 않습니다. 확인은 당신이 하는 일입니다.
@@ -184,6 +185,7 @@ Deno.serve(async (req: Request) => {
     };
 
     (async () => {
+      const t0 = Date.now();
       try {
         // 출력이 길어야 몇천 토큰이라 스트리밍 없이 한 번에 받는다.
         // (SDK 가 max_tokens 크기에 맞춰 대기 시간을 늘려 준다)
@@ -202,6 +204,7 @@ Deno.serve(async (req: Request) => {
           messages: [{ role: "user", content: userPrompt }],
         });
 
+        console.log(`AI 응답까지 ${Math.round((Date.now() - t0) / 1000)}초 (한도 150초)`);
         // 검색을 실제로 어떻게 썼는지 서버 기록에 남긴다 (Supabase → Edge Functions → Logs 에서 봄).
         // "찾지 못함"이 자꾸 나오면 여기서 검색어가 이상한지, 결과가 비었는지 확인한다.
         for (const b of msg.content as Array<Record<string, unknown>>) {

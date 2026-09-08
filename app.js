@@ -19,7 +19,7 @@ function readConfig() {
   return null;
 }
 // 앱 버전 (배포할 때마다 올립니다 — 폰이 새 코드를 받았는지 확인용)
-const APP_VERSION = '1.15.2';
+const APP_VERSION = '1.15.3';
 
 const conf = readConfig();
 const configured = !!conf;
@@ -999,7 +999,7 @@ async function runAnalysis() {
     alert('분석할 내용이 너무 짧아요. 제목이나 본문을 조금 더 적어 주세요.');
     return;
   }
-  if (!confirm('AI 분석에는 비용이 듭니다 (한 번에 약 100원 안팎).\n30초~1분쯤 걸려요. 진행할까요?')) return;
+  if (!confirm('AI 분석에는 비용이 듭니다 (한 번에 약 100~200원).\n30초~1분쯤 걸려요. 진행할까요?')) return;
 
   aiBusy = true;
   $('aiBtn').disabled = true;

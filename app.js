@@ -19,7 +19,7 @@ function readConfig() {
   return null;
 }
 // 앱 버전 (배포할 때마다 올립니다 — 폰이 새 코드를 받았는지 확인용)
-const APP_VERSION = '1.15.3';
+const APP_VERSION = '1.16.0';
 
 const conf = readConfig();
 const configured = !!conf;
@@ -911,10 +911,22 @@ function renderAnalysis(a, opts = {}) {
   head.textContent = '🤖 AI 분석';
   aiRow.appendChild(head);
   if (opts.loading) {
+    // 모래시계가 돌고 경과 시간이 올라가야 "진행 중"이라는 걸 알 수 있다 (글자만으로는 안 보였다)
+    const wait = document.createElement('div');
+    wait.className = 'ai-wait';
+    const spin = document.createElement('span');
+    spin.className = 'ai-spin';
+    spin.textContent = '⏳';
+    const txt = document.createElement('div');
     const p = document.createElement('div');
-    p.className = 'ai-meta';
     p.textContent = opts.text || '분석 중… 30초~2분쯤 걸려요. 이 화면을 그대로 두세요.';
-    aiRow.appendChild(p);
+    const el = document.createElement('div');
+    el.className = 'ai-elapsed';
+    el.id = 'aiElapsed';
+    el.textContent = '0초 지남';
+    txt.appendChild(p); txt.appendChild(el);
+    wait.appendChild(spin); wait.appendChild(txt);
+    aiRow.appendChild(wait);
     return;
   }
   if (opts.error) {
@@ -1002,9 +1014,18 @@ async function runAnalysis() {
   if (!confirm('AI 분석에는 비용이 듭니다 (한 번에 약 100~200원).\n30초~1분쯤 걸려요. 진행할까요?')) return;
 
   aiBusy = true;
-  $('aiBtn').disabled = true;
+  const btn = $('aiBtn');
+  btn.disabled = true;
+  btn.textContent = '⏳ 분석 중…';
   renderAnalysis(null, { loading: true });
+  aiRow.scrollIntoView({ behavior: 'smooth', block: 'center' });   // 진행 칸이 눈에 보이게
   syncBusy('AI 분석 중…');
+  // 경과 시간을 1초마다 올린다 (칸이 다시 그려져도 id 로 찾으므로 계속 이어진다)
+  const startedAt = Date.now();
+  const elapsedTimer = setInterval(() => {
+    const el = document.getElementById('aiElapsed');
+    if (el) el.textContent = `${Math.round((Date.now() - startedAt) / 1000)}초 지남`;
+  }, 1000);
   const memoId = current.id;
   // 시계가 조금 어긋나도 놓치지 않게 1분 앞선 시각부터 "새 결과"로 본다
   const sinceIso = new Date(Date.now() - 60 * 1000).toISOString();
@@ -1036,8 +1057,10 @@ async function runAnalysis() {
     syncFlash('⚠️ 분석 실패', 3000);
     if (current && current.id === memoId) renderAnalysis(null, { error: e.message || String(e) });
   } finally {
+    clearInterval(elapsedTimer);
     aiBusy = false;
-    $('aiBtn').disabled = false;
+    btn.disabled = false;
+    btn.textContent = '🤖 AI 분석';
   }
 }
 $('aiBtn').addEventListener('click', runAnalysis);

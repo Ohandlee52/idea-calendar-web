@@ -634,6 +634,11 @@ body {
 .ai-head { font-size: 13px; font-weight: 700; color: var(--text-soft); }
 .ai-text { white-space: pre-wrap; font-size: 14px; line-height: 1.55; word-break: break-word; }
 .ai-meta { font-size: 12px; color: var(--text-soft); }
+/* 분석 중 표시: 도는 모래시계 + 경과 시간 */
+.ai-wait { display: flex; align-items: center; gap: 10px; font-size: 14px; color: var(--text); }
+.ai-spin { display: inline-block; font-size: 22px; animation: ai-flip 1.4s linear infinite; }
+@keyframes ai-flip { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+.ai-elapsed { font-size: 12px; color: var(--text-soft); }
 .ai-err  { font-size: 13px; color: var(--danger); white-space: pre-wrap; }
 
 .ir-box { position: relative; }

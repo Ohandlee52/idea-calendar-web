@@ -338,7 +338,7 @@ Deno.serve(async (req: Request) => {
         const result = msg.content
           .filter((b) => b.type === "text")
           .map((b) => (b as { text: string }).text)
-          .join("\n")
+          .join("")   // 출처가 붙은 문장은 여러 조각으로 오므로 줄바꿈 없이 이어 붙인다
           .trim();
         if (!result) {
           await finish({ ok: false, error: "AI 가 빈 답을 돌려줬습니다. 다시 시도해 주세요." });
